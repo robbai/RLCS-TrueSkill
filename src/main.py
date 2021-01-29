@@ -1,17 +1,12 @@
 import math
 import itertools
-from json import loads as parse_json
 from typing import Dict, List, Tuple
 
-from tqdm import tqdm
 from tabulate import tabulate
 from trueskill import Rating, TrueSkill
 
-from requester import get_content
-
-# Main -> Event -> Match -> Game
-
-url: str = "https://api.octane.gg/api/event_list"
+from kelly import get_best_bet
+from ranking import setup_ranking
 
 
 # https://github.com/sublee/trueskill/issues/1#issuecomment-149762508
@@ -38,84 +33,37 @@ def win_probability_best_of(
     )
 
 
-def event_filter(event: Dict) -> bool:
-    # return (event["type"] == "RLCS" or "RLCS" in event["Event"]
-    #         # or "RLRS" in event["Event"]
-    #         ) and (
-    #     "North America" in event["Event"]
-    #     or "Europe" in event["Event"]
-    #     or "World Championship" in event["Event"]
-    # )
-    prize: str = event["prize"]
-    return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
+def input_teams(rankings: Dict[str, Rating]):
+    ratings: List[List[Rating]] = [[], []]
+    for i in range(6):
+        while True:
+            index: int = i % 3
+            team: int = i // 3
+            name = input(
+                "Player " + str(index + 1) + " on team " + str(team + 1) + ": "
+            ).title()
+            if name in rankings:
+                ratings[team].append(rankings[name])
+                break
+            else:
+                print("Couldn't find player")
+    return ratings
+
+
+def input_ratios() -> Tuple[float, float]:
+    ratio1: float = float(input("Team 1 return ratio: "))
+    ratio2: float = float(input("Team 2 return ratio: "))
+    innacuracy: float = (ratio1 * -ratio2 + ratio1 + ratio2) / (ratio1 - 1)
+    ratio1 = (2 * ratio2 + innacuracy) / (2 * ratio2 + innacuracy - 2)
+    ratio2 += innacuracy / 2
+    return (ratio1, ratio2)
 
 
 def main():
+    # Setup the ranking.
     env: TrueSkill = TrueSkill(draw_probability=0, backend="mpmath")
     rankings: Dict[str, Rating] = {}
-
-    matches: List[Tuple[str, int]] = []
-
-    # Iterate through events.
-    main_content: str = get_content(url)
-    event_table: List[Dict] = [
-        event for event in parse_json(main_content)["data"] if event_filter(event)
-    ]
-    for event in tqdm(event_table, desc="Event table"):
-
-        # Add matches.
-        matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
-            "EventHyphenated"
-        ]
-        event_content: str = get_content(matches_url)
-        match_table: List[Dict] = parse_json(event_content)["data"]
-        for match in match_table:
-            games: int = match["Team1Games"] + match["Team2Games"]
-            if games <= 1:
-                continue
-            matches.append((match["match_url"], games))
-
-    # Iterate through matches.
-    for match_id, games in tqdm(matches[::-1], desc="Match list"):
-        # for match_id, games in matches[::-1]:
-        invalid_match: bool = False
-
-        # Iterate through games (two teams).
-        for game_number in range(1, games + 1):
-            team_url_format: str = "https://api.octane.gg/api/match_scoreboard_{}/" + match_id + "/" + str(
-                game_number
-            )
-
-            winner: int = None
-            names: List[List[str]] = [[], []]
-            ratings: List[List[Rating]] = [[], []]
-
-            for i, team in enumerate(("one", "two")):
-                team_url: str = team_url_format.format(team)
-
-                try:
-                    team_content: str = get_content(team_url)
-                    team_table: List[Dict] = parse_json(team_content)["data"]
-                    winner = team_table[0]["Winner"]
-                    for name in team_table[:-1]:  # Last "player" is the sum.
-                        names[i].append(name["Player"].title())
-                        if not names[i][-1] in rankings:
-                            rankings[names[i][-1]] = env.create_rating()
-                        ratings[i].append(rankings[names[i][-1]])
-                except Exception:
-                    invalid_match = True
-                    break
-
-            if invalid_match or not all(len(named) == 3 for named in names):
-                break
-
-            ranks = [1, 1]
-            ranks[winner] = 0
-            new_ratings = env.rate(ratings, ranks)
-            for i in range(2):
-                for j, name in enumerate(names[i]):
-                    rankings[name] = new_ratings[i][j]
-    print()
+    setup_ranking(env, rankings)
 
     # Print the leaderboard.
     leaderboard: List[Tuple[str, float, float]] = []
@@ -124,34 +72,38 @@ def main():
     ):
         if player[1].sigma > 3:
             continue
-        leaderboard.append((player[0], str(player[1].mu), str(player[1].sigma)))
+        leaderboard.append((player[0], player[1].mu, player[1].sigma))
     print(tabulate(leaderboard, headers=["Name", "Mu", "Sigma"]))
     print()
 
     # Input loop
     while True:
-        ratings: List[List[Rating]] = [[], []]
-        for i in range(6):
-            while True:
-                index: int = i % 3
-                team: int = i // 3
-                name = input(
-                    "Player " + str(index + 1) + " on team " + str(team + 1) + ": "
-                ).title()
-                if name in rankings:
-                    ratings[team].append(rankings[name])
-                    break
-                else:
-                    print("Couldn't find player")
+        ratings: List[List[Rating]] = input_teams(rankings)
         probability: float = win_probability(env, *ratings)
-        print("Win probabilities:")
+        ratios: Tuple[float, float] = input_ratios()
+        print(
+            "Adjusted return ratios: 1:"
+            + str(round(ratios[0], 4))
+            + ", 1:"
+            + str(round(ratios[1], 4))
+        )
         for best_of in range(1, 8, 2):
+            probability_best_of: float = win_probability_best_of(best_of, probability)
+            best_bet: float = get_best_bet(probability_best_of, ratios)
             print(
-                "Team 1 in BO"
+                "Team "
+                + ("1" if probability_best_of > 0.5 else "2")
+                + " in BO"
                 + str(best_of)
                 + ": "
-                + str(round(win_probability_best_of(best_of, probability) * 100, 2))
-                + "%"
+                + str(
+                    round(max(probability_best_of, 1 - probability_best_of) * 100, 2)
+                ).rjust(6)
+                + "% (Bet "
+                + str(round(abs(best_bet) * 100, 2)).rjust(6)
+                + "% on Team "
+                + ("1" if best_bet > 0 else "2")
+                + ")"
             )
         print()
 
