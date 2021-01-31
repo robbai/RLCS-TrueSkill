@@ -33,14 +33,14 @@ def win_probability_best_of(
     )
 
 
-def input_teams(rankings: Dict[str, Rating]):
+def input_players(teams: List[str], rankings: Dict[str, Rating]):
     ratings: List[List[Rating]] = [[], []]
     for i in range(6):
         while True:
             index: int = i % 3
             team: int = i // 3
             name = input(
-                "Player " + str(index + 1) + " on team " + str(team + 1) + ": "
+                "Player " + str(index + 1) + " on " + teams[team] + ": "
             ).title()
             if name in rankings:
                 ratings[team].append(rankings[name])
@@ -50,13 +50,13 @@ def input_teams(rankings: Dict[str, Rating]):
     return ratings
 
 
-def input_ratios() -> Tuple[float, float]:
-    ratio1: float = float(input("Team 1 return ratio: "))
-    ratio2: float = float(input("Team 2 return ratio: "))
-    innacuracy: float = (ratio1 * -ratio2 + ratio1 + ratio2) / (ratio1 - 1)
-    ratio1 = (2 * ratio2 + innacuracy) / (2 * ratio2 + innacuracy - 2)
-    ratio2 += innacuracy / 2
-    return (ratio1, ratio2)
+def input_ratios(teams: List[str]) -> Tuple[float, float]:
+    ratio1: float = float(input(teams[0] + " return ratio: "))
+    ratio2: float = float(input(teams[1] + " return ratio: "))
+    inaccuracy: float = (ratio1 * -ratio2 + ratio1 + ratio2) / (ratio1 - 1)
+    ratio1 = (2 * ratio2 + inaccuracy) / (2 * ratio2 + inaccuracy - 2)
+    ratio2 += inaccuracy / 2
+    return ratio1, ratio2
 
 
 def main():
@@ -78,11 +78,15 @@ def main():
 
     # Input loop
     while True:
-        ratings: List[List[Rating]] = input_teams(rankings)
+        teams: List[str] = [
+            input("Team " + str(i + 1) + ": ").upper() for i in range(2)
+        ]
+        ratings: List[List[Rating]] = input_players(teams, rankings)
         probability: float = win_probability(env, *ratings)
-        ratios: Tuple[float, float] = input_ratios()
+        ratios: Tuple[float, float] = input_ratios(teams)
+        print("\n" + teams[0] + " vs " + teams[1])
         print(
-            "Adjusted return ratios: 1:"
+            "Return ratios: 1:"
             + str(round(ratios[0], 4))
             + ", 1:"
             + str(round(ratios[1], 4))
@@ -91,8 +95,7 @@ def main():
             probability_best_of: float = win_probability_best_of(best_of, probability)
             best_bet: float = get_best_bet(probability_best_of, ratios)
             print(
-                "Team "
-                + ("1" if probability_best_of > 0.5 else "2")
+                teams[0 if probability_best_of > 0.5 else 1].ljust(len(max(teams)))
                 + " in BO"
                 + str(best_of)
                 + ": "
@@ -101,8 +104,8 @@ def main():
                 ).rjust(6)
                 + "% (Bet "
                 + str(round(abs(best_bet) * 100, 2)).rjust(6)
-                + "% on Team "
-                + ("1" if best_bet > 0 else "2")
+                + "% on "
+                + teams[0 if best_bet > 0 else 1].rjust(len(max(teams)))
                 + ")"
             )
         print()
