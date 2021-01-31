@@ -3,6 +3,7 @@ import itertools
 from typing import Dict, List, Tuple
 
 from tabulate import tabulate
+from pyperclip import copy as clipboard
 from trueskill import Rating, TrueSkill
 
 from kelly import get_best_bet
@@ -84,18 +85,18 @@ def main():
         ratings: List[List[Rating]] = input_players(teams, rankings)
         probability: float = win_probability(env, *ratings)
         ratios: Tuple[float, float] = input_ratios(teams)
-        print("\n" + teams[0] + " vs " + teams[1])
-        print(
+        output: List[str] = [
+            teams[0] + " vs " + teams[1],
             "Return ratios: 1:"
             + str(round(ratios[0], 4))
             + ", 1:"
-            + str(round(ratios[1], 4))
-        )
+            + str(round(ratios[1], 4)),
+        ]
         for best_of in range(1, 8, 2):
             probability_best_of: float = win_probability_best_of(best_of, probability)
             best_bet: float = get_best_bet(probability_best_of, ratios)
-            print(
-                teams[0 if probability_best_of > 0.5 else 1].ljust(len(max(teams)))
+            output.append(
+                teams[0 if probability_best_of > 0.5 else 1]
                 + " in BO"
                 + str(best_of)
                 + ": "
@@ -105,9 +106,12 @@ def main():
                 + "% (Bet "
                 + str(round(abs(best_bet) * 100, 2)).rjust(6)
                 + "% on "
-                + teams[0 if best_bet > 0 else 1].rjust(len(max(teams)))
+                + teams[0 if best_bet > 0 else 1].rjust(len(max(teams, key=len)))
                 + ")"
             )
+        clipboard("```\n" + "\n".join(output) + "\n```")
+        print()
+        print("\n".join(output))
         print()
 
 
