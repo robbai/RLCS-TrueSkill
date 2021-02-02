@@ -6,53 +6,50 @@ from trueskill import Rating, TrueSkill
 
 from requester import get_content
 
-# Main -> Event -> Match -> Game
+# Archive/Unfinished -> Event -> Match -> Game
 
-url: str = "https://api.octane.gg/api/event_list"
+unfinished_url: str = "https://api.octane.gg/api/event_list/upcoming"
+archive_url: str = "https://api.octane.gg/api/event_list"
 
 
 def event_filter(event: Dict) -> bool:
-    # return (event["type"] == "RLCS" or "RLCS" in event["Event"]
-    #         # or "RLRS" in event["Event"]
-    #         ) and (
-    #     "North America" in event["Event"]
-    #     or "Europe" in event["Event"]
-    #     or "World Championship" in event["Event"]
-    # )
     prize: str = event["prize"]
     return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
 
 
-def get_matches() -> List[Tuple[str, int]]:
-    matches: List[Tuple[str, int]] = []
+def get_matches() -> List[Tuple[str, int, bool]]:
+    matches: List[Tuple[str, int, bool]] = []
 
-    # Iterate through events.
-    main_content: str = get_content(url)
-    event_table: List[Dict] = [
-        event for event in parse_json(main_content)["data"] if event_filter(event)
-    ]
-    for event in tqdm(event_table, desc="Event table"):
+    for url in (archive_url, unfinished_url):
+        unfinished: bool = (url == unfinished_url)
 
-        # Add matches.
-        matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
-            "EventHyphenated"
+        # Iterate through events.
+        main_content: str = get_content(url, can_cache=False)
+        event_table: List[Dict] = [
+            event for event in parse_json(main_content)["data"] if event_filter(event)
         ]
-        event_content: str = get_content(matches_url)
-        match_table: List[Dict] = parse_json(event_content)["data"]
-        for match in match_table:
-            games: int = match["Team1Games"] + match["Team2Games"]
-            if games <= 1:
-                continue
-            matches.append((match["match_url"], games))
+        for event in tqdm(event_table, desc="Event table"):
+
+            # Add matches.
+            matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
+                "EventHyphenated"
+            ]
+            event_content: str = get_content(matches_url, can_cache=not unfinished)
+            match_table: List[Dict] = parse_json(event_content)["data"]
+            for match in match_table:
+                games: int = match["Team1Games"] + match["Team2Games"]
+                if games <= 1:
+                    continue
+                matches.append((match["match_url"], games, unfinished))
 
     return matches
 
 
 def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
-    matches: List[Tuple[str, int]] = get_matches()
+    matches: List[Tuple[str, int, bool]] = get_matches()
 
     # Iterate through matches.
-    for match_id, games in tqdm(matches[::-1], desc="Match list"):
+    for match_id, games, unfinished in tqdm(matches[::-1], desc="Match list"):
         # for match_id, games in matches[::-1]:
         invalid_match: bool = False
 
@@ -70,7 +67,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                 team_url: str = team_url_format.format(team)
 
                 try:
-                    team_content: str = get_content(team_url)
+                    team_content: str = get_content(team_url, can_cache=not unfinished)
                     team_table: List[Dict] = parse_json(team_content)["data"]
                     winner = team_table[0]["Winner"]
                     for name in team_table[:-1]:  # Last "player" is the sum.
