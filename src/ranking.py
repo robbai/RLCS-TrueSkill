@@ -13,6 +13,12 @@ archive_url: str = "https://api.octane.gg/api/event_list"
 
 
 def event_filter(event: Dict) -> bool:
+    name: str = event["Event"]
+    if name.startswith("RLCS") or name.startswith("RLRS"):
+        return True
+    type: str = event["type"]
+    if type == "RLCS" or type == "RLRS":
+        return True
     prize: str = event["prize"]
     return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
 
@@ -28,19 +34,22 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         event_table: List[Dict] = [
             event for event in parse_json(main_content)["data"] if event_filter(event)
         ]
-        for event in tqdm(event_table, desc="Event table"):
+        for event in tqdm(event_table, desc=("Unfinished" if unfinished else "Archived") + " events"):
 
             # Add matches.
             matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
                 "EventHyphenated"
             ]
             event_content: str = get_content(matches_url, can_cache=not unfinished)
-            match_table: List[Dict] = parse_json(event_content)["data"]
-            for match in match_table:
-                games: int = match["Team1Games"] + match["Team2Games"]
-                if games <= 1:
-                    continue
-                matches.append((match["match_url"], games, unfinished))
+            try:
+                match_table: List[Dict] = parse_json(event_content)["data"]
+                for match in match_table:
+                    games: int = match["Team1Games"] + match["Team2Games"]
+                    if games <= 1:
+                        continue
+                    matches.append((match["match_url"], games, unfinished))
+            except Exception:
+                pass
 
     return matches
 
