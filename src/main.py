@@ -34,20 +34,25 @@ def win_probability_best_of(
     )
 
 
-def input_players(teams: List[str], rankings: Dict[str, Rating]):
+def input_players(
+    team_names: List[str], rankings: Dict[str, Rating], teams: Dict[str, List[Rating]]
+):
     ratings: List[List[Rating]] = [[], []]
-    for i in range(6):
-        while True:
-            index: int = i % 3
-            team: int = i // 3
-            name = input(
-                "Player " + str(index + 1) + " on " + teams[team] + ": "
-            ).title()
-            if name in rankings:
-                ratings[team].append(rankings[name])
-                break
-            else:
-                print("Couldn't find player")
+    for team in range(2):
+        if team_names[team] in teams:
+            ratings[team] = teams[team_names[team]]
+            continue
+        for index in range(3):
+            while True:
+                name = input(
+                    "Player " + str(index + 1) + " on " + team_names[team] + ": "
+                ).title()
+                if name in rankings:
+                    ratings[team].append(rankings[name])
+                    break
+                else:
+                    print("Couldn't find player")
+        teams[team_names[team]] = ratings[team]
     return ratings
 
 
@@ -77,16 +82,19 @@ def main():
     print(tabulate(leaderboard, headers=["Name", "Mu", "Sigma"]))
     print()
 
+    # Dictionary of team names to rankings.
+    teams: Dict[str, List[Rating]] = {}
+
     # Input loop
     while True:
-        teams: List[str] = [
+        team_names: List[str] = [
             input("Team " + str(i + 1) + ": ").upper() for i in range(2)
         ]
-        ratings: List[List[Rating]] = input_players(teams, rankings)
+        ratings: List[List[Rating]] = input_players(team_names, rankings, teams)
         probability: float = win_probability(env, *ratings)
-        ratios: Tuple[float, float] = input_ratios(teams)
+        ratios: Tuple[float, float] = input_ratios(team_names)
         output: List[str] = [
-            teams[0] + " vs " + teams[1],
+            team_names[0] + " vs " + team_names[1],
             "Return ratios: 1:"
             + str(round(ratios[0], 4))
             + ", 1:"
@@ -96,7 +104,7 @@ def main():
             probability_best_of: float = win_probability_best_of(best_of, probability)
             best_bet: float = get_best_bet(probability_best_of, ratios)
             output.append(
-                teams[0 if probability_best_of > 0.5 else 1]
+                team_names[0 if probability_best_of > 0.5 else 1]
                 + " in BO"
                 + str(best_of)
                 + ": "
@@ -106,7 +114,9 @@ def main():
                 + "% (Bet "
                 + str(round(abs(best_bet) * 100, 2)).rjust(6)
                 + "% on "
-                + teams[0 if best_bet > 0 else 1].rjust(len(max(teams, key=len)))
+                + team_names[0 if best_bet > 0 else 1].rjust(
+                    len(max(team_names, key=len))
+                )
                 + ")"
             )
         clipboard("```\n" + "\n".join(output) + "\n```")
