@@ -1,28 +1,34 @@
+from os import remove
 from re import sub
-from pickle import dump, load
+from pickle import load
 from os.path import isfile
 
 from requests import get as request
 
 
 def get_content(url: str, can_cache: bool = True) -> str:
-    page: "requests.models.Response" = None
-    file_name: str = "cache/" + sub(
-        r"[^a-zA-Z0-9_ ]+", "", url.replace("/", "_")
-    ) + ".obj"
+    content: str = None
+    file_name: str = "cache/" + sub(r"[^a-zA-Z0-9_ ]+", "", url.replace("/", "_"))
 
     # Cache.
-    cached: bool = can_cache and isfile(file_name)
-    if cached:
-        file = open(file_name, "rb")
-        page = load(file)
+    if can_cache and isfile(file_name + ".obj"):
+        file = open(file_name + ".obj", "rb")
+        content = load(file).content.decode("utf-8")
+        file.close()
+        remove(file_name + ".obj")
+        file = open(file_name + ".json", "w")
+        file.write(content)
+        file.close()
+    elif can_cache and isfile(file_name + ".json"):
+        file = open(file_name + ".json", "r")
+        content = file.read()
         file.close()
     else:
         # Request.
-        page = request(url)
+        content = request(url).content.decode("utf-8")
         if can_cache:
-            file = open(file_name, "wb")
-            dump(page, file)
+            file = open(file_name + ".json", "w")
+            file.write(content)
             file.close()
 
-    return page.content.decode("utf-8")
+    return content

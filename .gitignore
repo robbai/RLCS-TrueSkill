@@ -1,5 +1,6 @@
 # RLCS TrueSkill
-src/cache/*.obj
+src/cache/*
+!src/cache/__init__.py
 
 # IntelliJ
 .idea/
