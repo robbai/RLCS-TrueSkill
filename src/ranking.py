@@ -34,7 +34,9 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         event_table: List[Dict] = [
             event for event in parse_json(main_content)["data"] if event_filter(event)
         ]
-        for event in tqdm(event_table, desc=("Unfinished" if unfinished else "Archived") + " events"):
+        for event in tqdm(
+            event_table, desc=("Unfinished" if unfinished else "Archived") + " events"
+        ):
 
             # Add matches.
             matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
@@ -78,9 +80,9 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                 try:
                     team_content: str = get_content(team_url, can_cache=not unfinished)
                     team_table: List[Dict] = parse_json(team_content)["data"]
-                    winner = team_table[0]["Winner"]
+                    winner = (i if team_table[0]["Winner"] else not i)
                     for name in team_table[:-1]:  # Last "player" is the sum.
-                        names[i].append(name["Player"].title())
+                        names[i].append(name["Player"].title().strip())
                         if not names[i][-1] in rankings:
                             rankings[names[i][-1]] = env.create_rating()
                         ratings[i].append(rankings[names[i][-1]])

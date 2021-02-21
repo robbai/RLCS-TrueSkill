@@ -76,8 +76,8 @@ def main():
     for player in sorted(
         rankings.items(), key=lambda player: env.expose(player[1]), reverse=True,
     ):
-        if player[1].sigma > 3:
-            continue
+        # if player[1].sigma > 3:
+        #     continue
         leaderboard.append((player[0], player[1].mu, player[1].sigma))
     print(tabulate(leaderboard, headers=["Name", "Mu", "Sigma"]))
     print()
