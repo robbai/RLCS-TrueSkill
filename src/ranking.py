@@ -80,7 +80,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                 try:
                     team_content: str = get_content(team_url, can_cache=not unfinished)
                     team_table: List[Dict] = parse_json(team_content)["data"]
-                    winner = (i if team_table[0]["Winner"] else not i)
+                    winner = i if team_table[0]["Winner"] else not i
                     for name in team_table[:-1]:  # Last "player" is the sum.
                         names[i].append(name["Player"].title().strip())
                         if not names[i][-1] in rankings:
