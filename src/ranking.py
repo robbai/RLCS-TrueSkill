@@ -28,6 +28,12 @@ def event_filter(event: Dict) -> bool:
     return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
 
 
+def fix_player_name(name: str) -> str:
+    if name == "Scrub":
+        name = "Scrub Killa"
+    return name
+
+
 def get_matches() -> List[Tuple[str, int, bool]]:
     matches: List[Tuple[str, int, bool]] = []
 
@@ -43,7 +49,6 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         for event in tqdm(
             event_table, desc=("Unfinished" if unfinished else "Archived") + " events"
         ):
-
             # Add matches.
             matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
                 "EventHyphenated"
@@ -88,10 +93,12 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                     team_table: List[Dict] = parse_json(team_content)["data"]
                     winner = i if team_table[0]["Winner"] else not i
                     for name in team_table[:-1]:  # Last "player" is the sum.
-                        names[i].append(name["Player"].title().strip())
-                        if not names[i][-1] in rankings:
-                            rankings[names[i][-1]] = env.create_rating()
-                        ratings[i].append(rankings[names[i][-1]])
+                        title_name: str = name["Player"].title().strip()
+                        title_name = fix_player_name(title_name)
+                        names[i].append(title_name)
+                        if title_name not in rankings:
+                            rankings[title_name] = env.create_rating()
+                        ratings[i].append(rankings[title_name])
                 except Exception:
                     invalid_match = True
                     break
