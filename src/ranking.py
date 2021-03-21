@@ -14,10 +14,15 @@ archive_url: str = "https://api.octane.gg/api/event_list"
 
 def event_filter(event: Dict) -> bool:
     name: str = event["Event"]
-    if name.startswith("RLCS") or name.startswith("RLRS"):
-        return True
     type: str = event["type"]
-    if type == "RLCS" or type == "RLRS":
+    if not (
+        name.startswith("RLCS")
+        or name.startswith("RLRS")
+        or type == "RLCS"
+        or type == "RLRS"
+    ):
+        return False
+    if "Qualifier" in name:
         return True
     prize: str = event["prize"]
     return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
