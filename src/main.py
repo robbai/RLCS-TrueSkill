@@ -78,8 +78,10 @@ def main():
     ):
         # if player[1].sigma > 3:
         #     continue
-        leaderboard.append((player[0], player[1].mu, player[1].sigma))
-    print(tabulate(leaderboard, headers=["Name", "Mu", "Sigma"]))
+        leaderboard.append(
+            (player[0], env.expose(player[1]), player[1].mu, player[1].sigma)
+        )
+    print(tabulate(leaderboard, headers=["Name", "Rating", "Mu", "Sigma"]))
     print()
 
     # Dictionary of team names to rankings.
