@@ -39,6 +39,7 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         event_table: List[Dict] = [
             event for event in parse_json(main_content)["data"] if event_filter(event)
         ]
+        print("\n".join(event["Event"] for event in event_table))
         for event in tqdm(
             event_table, desc=("Unfinished" if unfinished else "Archived") + " events"
         ):
