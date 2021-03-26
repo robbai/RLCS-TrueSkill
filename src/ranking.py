@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 from tqdm import tqdm
 from trueskill import Rating, TrueSkill
 
-from requester import get_content
+from requester import get_content, remove_cache
 
 # Archive/Unfinished -> Event -> Match -> Game
 
@@ -45,7 +45,7 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         event_table: List[Dict] = [
             event for event in parse_json(main_content)["data"] if event_filter(event)
         ]
-        print("\n".join(event["Event"] for event in event_table))
+        event_results: List[str] = []
         for event in tqdm(
             event_table, desc=("Unfinished" if unfinished else "Archived") + " events"
         ):
@@ -53,16 +53,26 @@ def get_matches() -> List[Tuple[str, int, bool]]:
             matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
                 "EventHyphenated"
             ]
-            event_content: str = get_content(matches_url, can_cache=not unfinished)
+            event_content: str = get_content(matches_url, can_cache=False)
+            event_matches: List[Tuple[str, int, bool]] = []
             try:
                 match_table: List[Dict] = parse_json(event_content)["data"]
                 for match in match_table:
                     games: int = match["Team1Games"] + match["Team2Games"]
                     if games <= 1:
                         continue
-                    matches.append((match["match_url"], games, unfinished))
+                    event_matches.append((match["match_url"], games, unfinished))
             except Exception:
-                pass
+                remove_cache(matches_url)
+                continue
+            if event_matches:
+                matches += event_matches
+                event_results.append(
+                    event["Event"] + " (" + str(len(event_matches)) + ")"
+                )
+            else:
+                remove_cache(matches_url)
+        print("\n".join(event_results))
 
     return matches
 
@@ -72,10 +82,9 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
 
     # Iterate through matches.
     for match_id, games, unfinished in tqdm(matches[::-1], desc="Match list"):
-        # for match_id, games in matches[::-1]:
         invalid_match: bool = False
 
-        # Iterate through games (two teams).
+        # Iterate through games.
         for game_number in range(1, games + 1):
             team_url_format: str = "https://api.octane.gg/api/match_scoreboard_{}/" + match_id + "/" + str(
                 game_number
@@ -85,6 +94,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
             names: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
 
+            # Iterate through the two teams.
             for i, team in enumerate(("one", "two")):
                 team_url: str = team_url_format.format(team)
 
@@ -101,6 +111,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                         ratings[i].append(rankings[title_name])
                 except Exception:
                     invalid_match = True
+                    remove_cache(team_url)
                     break
 
             if invalid_match or any(len(named) != 3 for named in names):
