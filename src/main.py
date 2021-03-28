@@ -96,8 +96,8 @@ def main():
         probability: float = win_probability(env, *ratings)
         ratios: Tuple[float, float] = input_ratios(team_names)
         output: List[str] = [
-            team_names[0] + " vs " + team_names[1],
-            "Return ratios: 1:"
+            " " + team_names[0] + " vs " + team_names[1],
+            " Return ratios: 1:"
             + str(round(ratios[0], 4))
             + ", 1:"
             + str(round(ratios[1], 4)),
@@ -106,7 +106,8 @@ def main():
             probability_best_of: float = win_probability_best_of(best_of, probability)
             best_bet: float = get_best_bet(probability_best_of, ratios)
             output.append(
-                team_names[0 if probability_best_of > 0.5 else 1]
+                ("+" if (probability_best_of > 0.5) == (best_bet > 0) else "-")
+                + team_names[0 if probability_best_of > 0.5 else 1]
                 + " in BO"
                 + str(best_of)
                 + ": "
@@ -121,9 +122,9 @@ def main():
                 )
                 + ")"
             )
-        clipboard("```\n" + "\n".join(output) + "\n```")
+        clipboard("```diff\n" + "\n".join(output) + "\n```")
         print()
-        print("\n".join(output))
+        print("\n".join(line[1:] for line in output))
         print()
 
 
