@@ -37,6 +37,15 @@ def event_filter(event: Dict) -> bool:
 def fix_player_name(name: str) -> str:
     if name == "Scrub":
         name = "Scrub Killa"
+
+    # https://octane.gg/match/8810136
+    if name == "M":
+        name = "Saizen"
+    if name == "Radosin":
+        name = "Radosin75"
+    if name == "Joyo!":
+        name = "Joyo"
+
     return name
 
 
