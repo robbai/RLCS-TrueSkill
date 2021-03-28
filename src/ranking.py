@@ -56,7 +56,7 @@ def parse_date(data: Dict) -> dtime:
 def get_matches() -> List[Tuple[str, int, bool]]:
     matches: List[Tuple[str, int, bool]] = []
 
-    for url in (archive_url, unfinished_url):
+    for url in (unfinished_url, archive_url):
         unfinished: bool = (url == unfinished_url)
 
         # Iterate through events.
