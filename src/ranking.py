@@ -15,7 +15,7 @@ archive_url: str = "https://api.octane.gg/api/event_list"
 
 # Cache events and invalid matches that are older than this.
 # All valid matches are cached.
-CACHE_TIME: dtime = dtime.now() - timedelta(days=90)
+CACHE_TIME: dtime = dtime.now() - timedelta(days=30)
 
 
 def event_filter(event: Dict) -> bool:
@@ -28,8 +28,10 @@ def event_filter(event: Dict) -> bool:
         or type == "RLRS"
     ):
         return False
-    if "Qualifier" in name:
-        return True
+    if "The Grid" in name:
+        return False
+    # if "Qualifier" in name:
+    #     return True
     prize: str = event["prize"]
     return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
 
@@ -37,15 +39,10 @@ def event_filter(event: Dict) -> bool:
 def fix_player_name(name: str) -> str:
     if name == "Scrub":
         name = "Scrub Killa"
-
-    # https://octane.gg/match/8810136
-    if name == "M":
-        name = "Saizen"
-    if name == "Radosin":
+    elif name == "Radosin":
         name = "Radosin75"
-    if name == "Joyo!":
+    elif name == "Joyo!":
         name = "Joyo"
-
     return name
 
 
@@ -96,9 +93,8 @@ def get_matches() -> List[Tuple[str, int, bool]]:
 
 
 def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
-    matches: List[Tuple[str, int, bool]] = get_matches()
-
     # Iterate through matches.
+    matches: List[Tuple[str, int, bool]] = get_matches()
     for match_id, games, unfinished in tqdm(matches[::-1], desc="Match list"):
         invalid_match: bool = False
 
@@ -145,4 +141,5 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
             for i in range(2):
                 for j, name in enumerate(names[i]):
                     rankings[name] = new_ratings[i][j]
+
     print()
