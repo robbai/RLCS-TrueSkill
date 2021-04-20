@@ -37,9 +37,7 @@ def event_filter(event: Dict) -> bool:
 
 
 def fix_player_name(name: str) -> str:
-    if name == "Scrub":
-        name = "Scrub Killa"
-    elif name == "Radosin":
+    if name == "Radosin":
         name = "Radosin75"
     elif name == "Joyo!":
         name = "Joyo"
