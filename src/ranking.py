@@ -90,11 +90,42 @@ def get_matches() -> List[Tuple[str, int, bool]]:
     return matches
 
 
-def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
+def update_rankings(
+    env: TrueSkill,
+    rankings: Dict[str, Rating],
+    ratings: List[List[Rating]],
+    names: List[List[str]],
+    winner: int,
+    series: List[int],
+    series_total: List[List[List[int]]],
+):
+    # Update rankings.
+    ranks = [1, 1]
+    ranks[winner] = 0
+    new_ratings = env.rate(ratings, ranks)
+    for i in range(2):
+        for j, name in enumerate(names[i]):
+            rankings[name] = new_ratings[i][j]
+
+    # Update series.
+    if len(series_total) <= max(series):
+        for s in series_total:
+            s.append([0, 0])
+        series_total.append([[0, 0] for _ in range(max(series) + 1)])
+    series_total[series[winner]][series[not winner]][0] += 1
+    series_total[series[winner]][series[not winner]][1] += 1
+    series_total[series[not winner]][series[winner]][1] += 1
+    series[winner] += 1
+
+
+def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]) -> List[List[float]]:
+    series_total: List[List[List[int]]] = []
+
     # Iterate through matches.
     matches: List[Tuple[str, int, bool]] = get_matches()
     for match_id, games, unfinished in tqdm(matches[::-1], desc="Match list"):
         invalid_match: bool = False
+        series: List[int] = [0, 0]
 
         # Iterate through games.
         for game_number in range(1, games + 1):
@@ -133,11 +164,11 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
             if invalid_match or any(len(named) != 3 for named in names):
                 break
 
-            ranks = [1, 1]
-            ranks[winner] = 0
-            new_ratings = env.rate(ratings, ranks)
-            for i in range(2):
-                for j, name in enumerate(names[i]):
-                    rankings[name] = new_ratings[i][j]
+            update_rankings(env, rankings, ratings, names, winner, series, series_total)
 
     print()
+
+    series_rates: List[List[float]] = [
+        [(rate[0] + 1) / (rate[1] + 2) for rate in series] for series in series_total
+    ]
+    return series_rates

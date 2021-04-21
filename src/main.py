@@ -20,17 +20,28 @@ def win_probability(env: TrueSkill, team1: List[Rating], team2: List[Rating]) ->
 
 
 def win_probability_best_of(
-    best_of: int, probability: float, score: Tuple[int, int] = (0, 0)
+    best_of: int,
+    probability: float,
+    score: Tuple[int, int] = (0, 0),
+    series_rates: List[List[float]] = None,
 ) -> float:
     first_to: int = best_of // 2 + 1
     if score[0] == first_to:
         return 1
     elif score[1] == first_to:
         return 0
-    return probability * win_probability_best_of(
-        best_of, probability, (score[0] + 1, score[1])
-    ) + (1 - probability) * win_probability_best_of(
-        best_of, probability, (score[0], score[1] + 1)
+    if series_rates:
+        rate: float = series_rates[score[0]][score[1]]
+        if rate >= 0.5:
+            probability_adj: float = probability + (1 - probability) * 2 * (rate - 0.5)
+        else:
+            probability_adj: float = probability - probability * 2 * (0.5 - rate)
+    else:
+        probability_adj: float = probability
+    return probability_adj * win_probability_best_of(
+        best_of, probability, (score[0] + 1, score[1]), series_rates
+    ) + (1 - probability_adj) * win_probability_best_of(
+        best_of, probability, (score[0], score[1] + 1), series_rates
     )
 
 
@@ -69,7 +80,20 @@ def main():
     # Setup the ranking.
     env: TrueSkill = TrueSkill(draw_probability=0, backend="mpmath")
     rankings: Dict[str, Rating] = {}
-    setup_ranking(env, rankings)
+    series_rates: List[List[float]] = setup_ranking(env, rankings)
+
+    print("Series:")
+    print(" " + (" " * 6).join(str(i) for i in range(-1, len(series_rates)))[2:])
+    print("  \\" + ("-" * 6 * (len(series_rates) + 1))[1:])
+    print(
+        "\n".join(
+            [
+                str(i) + " | " + " ".join(["{:.4f}".format(val) for val in series])
+                for i, series in enumerate(series_rates)
+            ]
+        )
+    )
+    print()
 
     # Print the leaderboard.
     leaderboard: List[Tuple[str, float, float]] = []
