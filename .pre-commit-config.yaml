@@ -5,7 +5,7 @@ default_language_version:
 
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: master
+  rev: v4.0.1
   hooks:
   - id: check-added-large-files
     args: [--maxkb=1000]
@@ -15,23 +15,23 @@ repos:
   - id: trailing-whitespace
 
 - repo: https://github.com/ambv/black
-  rev: stable
+  rev: 21.7b0
   hooks:
   - id: black
 
 - repo: https://gitlab.com/pycqa/flake8
-  rev: master
+  rev: 3.9.2
   hooks:
   - id: flake8
 
 - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
-  rev: master
+  rev: v2.1.0
   hooks:
   - id: pretty-format-yaml
     args: [--autofix]
 
 - repo: https://github.com/pycqa/isort
-  rev: master
+  rev: 5.9.3
   hooks:
   - id: isort
     args: [--profile, black, --filter-files, --length-sort]
