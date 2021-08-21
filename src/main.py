@@ -82,7 +82,7 @@ def main():
     rankings: Dict[str, Rating] = {}
     series_rates: List[List[float]] = setup_ranking(env, rankings)
 
-    print("Series:")
+    print("\nSeries:")
     print(" " + (" " * 6).join(str(i) for i in range(-1, len(series_rates)))[2:])
     print("  \\" + ("-" * 6 * (len(series_rates) + 1))[1:])
     print(
@@ -98,7 +98,9 @@ def main():
     # Print the leaderboard.
     leaderboard: List[Tuple[str, float, float]] = []
     for player in sorted(
-        rankings.items(), key=lambda player: env.expose(player[1]), reverse=True,
+        rankings.items(),
+        key=lambda player: env.expose(player[1]),
+        reverse=True,
     ):
         # if player[1].sigma > 3:
         #     continue

@@ -1,5 +1,5 @@
 # RLCS TrueSkill
-src/cache/*
+src/cache*/*
 !src/cache/__init__.py
 src/manual.txt
 

@@ -1,3 +1,4 @@
+from re import sub
 from json import loads as parse_json
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime as dtime
@@ -5,87 +6,80 @@ from datetime import timedelta
 
 from tqdm import tqdm
 from trueskill import Rating, TrueSkill
+from dateutil.parser import isoparse
+from currency_converter import CurrencyConverter
 
-from requester import cache, get_content, remove_cache
+from requester import cache, get_content
 
-# Archive/Unfinished -> Event -> Match -> Game
+# Cache events and matches that are older than this.
+CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(days=30)
 
-unfinished_url: str = "https://api.octane.gg/api/event_list/upcoming"
-archive_url: str = "https://api.octane.gg/api/event_list"
 
-# Cache events and invalid matches that are older than this.
-# All valid matches are cached.
-CACHE_TIME: dtime = dtime.now() - timedelta(days=30)
+cc: CurrencyConverter = CurrencyConverter()
 
 
 def event_filter(event: Dict) -> bool:
-    name: str = event["Event"]
-    type: str = event["type"]
-    if not (
-        name.startswith("RLCS")
-        or name.startswith("RLRS")
-        or type == "RLCS"
-        or type == "RLRS"
-    ):
-        return False
-    if "The Grid" in name:
-        return False
-    # if "Qualifier" in name:
-    #     return True
-    prize: str = event["prize"]
-    return prize and prize[0] == "$" and float(prize[1:].replace(",", "")) >= 25000
+    if "groups" in event:
+        groups: List[str] = event["groups"]
+        if "grid" in groups:
+            return False
+        if "rlcs" in groups or "rlrs" in groups:
+            return True
+    if "prize" in event:
+        prize: Dict = event["prize"]
+        prize_pool: int = prize["amount"]
+        if prize["currency"] != "USD":
+            prize_pool: int = cc.convert(prize["amount"], prize["currency"], "USD")
+        return prize_pool >= 50000
+    return False
 
 
 def fix_player_name(name: str) -> str:
-    if name == "Radosin":
-        name = "Radosin75"
-    elif name == "Joyo!":
-        name = "Joyo"
-    return name
+    return sub(r"[^a-zA-Z0-9\- ]+", "", name.replace("_", " "))
 
 
-def parse_date(data: Dict) -> dtime:
-    return dtime.strptime(data["Date"].split("T", 1)[0], "%Y-%m-%d")
+def parse_event_date(event: Dict):
+    start: dtime = isoparse(event["startDate"])
+    end: dtime = isoparse(event["endDate"])
+    return start + (end - start) / 2
 
 
 def get_matches() -> List[Tuple[str, int, bool]]:
-    matches: List[Tuple[str, int, bool]] = []
+    # Collect all events.
+    url: str = "https://zsr.octane.gg/events"
+    page, per_page = 1, 500
+    events: List = []
+    while True:
+        events_content: str = get_content(
+            url, params={"page": page, "perPage": per_page, "mode": 3}
+        )
+        events_json: Dict = parse_json(events_content)
+        events += [event for event in events_json["events"] if event_filter(event)]
+        print(end=f"\rRequesting Events: {len(events)} Events")
+        if events_json["pageSize"] != per_page:
+            print("\n")
+            break
+        page += 1
+    events.sort(key=parse_event_date)  # Octane's sorting is temperamental.
+    print(*[event["name"] for event in events], sep="\n")
+    print()
 
-    for url in (unfinished_url, archive_url):
-        unfinished: bool = (url == unfinished_url)
-
-        # Iterate through events.
-        main_content: str = get_content(url)
-        event_table: List[Dict] = [
-            event for event in parse_json(main_content)["data"] if event_filter(event)
+    # Iterate through events.
+    url: str = "https://zsr.octane.gg/matches"
+    matches: List = []
+    for event_json in tqdm(events, desc="Events"):
+        params: Dict = {"event": event_json["_id"]}
+        matches_content: str = get_content(url, params=params)
+        matches_json: Dict = parse_json(matches_content)
+        should_cache: bool = (
+            isoparse(event_json["endDate"]).replace(tzinfo=None) < CACHE_TIME
+        )
+        matches += [
+            (match, should_cache, event_json["_id"])
+            for match in matches_json["matches"]
         ]
-        event_results: List[str] = []
-        for event in tqdm(
-            event_table, desc=("Unfinished" if unfinished else "Archived") + " events"
-        ):
-            # Add matches.
-            matches_url: str = "https://api.octane.gg/api/matches_event/" + event[
-                "EventHyphenated"
-            ]
-            event_content: str = get_content(matches_url)
-            event_matches: List[Tuple[str, int, bool]] = []
-            try:
-                match_table: List[Dict] = parse_json(event_content)["data"]
-                if parse_date(match_table[0]) < CACHE_TIME:
-                    cache(matches_url, event_content)
-                for match in match_table:
-                    games: int = match["Team1Games"] + match["Team2Games"]
-                    if games <= 1:
-                        continue
-                    event_matches.append((match["match_url"], games, unfinished))
-            except Exception:
-                continue
-            if event_matches:
-                matches += event_matches
-                event_results.append(
-                    event["Event"] + " (" + str(len(event_matches)) + ")"
-                )
-        print("\n".join(event_results))
+        if should_cache:
+            cache(url, matches_content, params=params)
 
     return matches
 
@@ -118,55 +112,55 @@ def update_rankings(
     series[winner] += 1
 
 
+def result_gen(match_json, should_cache):
+    # Check if we can quickly iterate through games without requesting them.
+    if all(
+        colour in match_json
+        and "players" in match_json[colour]
+        and len(match_json[colour]["players"]) == 3
+        for colour in ("blue", "orange")
+    ):
+        for game in match_json["games"]:
+            if "duration" in game:
+                yield match_json, game["orange"] > game["blue"]
+        return
+
+    url: str = f"https://zsr.octane.gg/matches/{match_json['_id']}/games"
+    games_content: str = get_content(url)
+    if should_cache:
+        cache(url, games_content)
+    games_json: Dict = parse_json(games_content)
+
+    # Iterate through games.
+    for game in games_json["games"]:
+        yield game, "winner" in game["orange"]
+
+
 def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]) -> List[List[float]]:
     series_total: List[List[List[int]]] = []
 
     # Iterate through matches.
-    matches: List[Tuple[str, int, bool]] = get_matches()
-    for match_id, games, unfinished in tqdm(matches[::-1], desc="Match list"):
-        invalid_match: bool = False
+    for match_json, should_cache, event_id in tqdm(get_matches(), desc="Matches"):
         series: List[int] = [0, 0]
-
-        # Iterate through games.
-        for game_number in range(1, games + 1):
-            team_url_format: str = "https://api.octane.gg/api/match_scoreboard_{}/" + match_id + "/" + str(
-                game_number
-            )
-
-            winner: int = None
+        for game_json, winner in result_gen(match_json, should_cache):
+            if max(series) >= 7:
+                print(series, match_json["_id"], event_id)
             names: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
 
-            # Iterate through the two teams.
-            for i, team in enumerate(("one", "two")):
-                team_url: str = team_url_format.format(team)
+            for team, colour in enumerate(("blue", "orange")):
+                for player in game_json[colour]["players"]:
+                    title_name: str = player["player"]["tag"].title().strip()
+                    title_name = fix_player_name(title_name)
+                    names[team].append(title_name)
+                    if title_name not in rankings:
+                        rankings[title_name] = env.create_rating()
+                    ratings[team].append(rankings[title_name])
 
-                team_date: Optional[dtime] = None
-                try:
-                    team_content: str = get_content(team_url)
-                    team_table: List[Dict] = parse_json(team_content)["data"]
-                    cache(team_url, team_content)
-                    team_date = parse_date(team_table[0])
-                    winner = i if team_table[0]["Winner"] else not i
-                    for name in team_table[:-1]:  # Last "player" is the sum.
-                        title_name: str = name["Player"].title().strip()
-                        title_name = fix_player_name(title_name)
-                        names[i].append(title_name)
-                        if title_name not in rankings:
-                            rankings[title_name] = env.create_rating()
-                        ratings[i].append(rankings[title_name])
-                except Exception:
-                    invalid_match = True
-                    if not team_date or team_date >= CACHE_TIME:
-                        remove_cache(team_url)
-                    break
-
-            if invalid_match or any(len(named) != 3 for named in names):
+            if any(len(named) != 3 for named in names):
                 break
 
             update_rankings(env, rankings, ratings, names, winner, series, series_total)
-
-    print()
 
     series_rates: List[List[float]] = [
         [(rate[0] + 1) / (rate[1] + 2) for rate in series] for series in series_total
