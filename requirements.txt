@@ -1,9 +1,11 @@
 black
+CurrencyConverter
 flake8
 isort
 mpmath
 pre-commit
 pyperclip
+python-dateutil
 requests
 tabulate
 tqdm
