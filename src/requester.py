@@ -38,9 +38,8 @@ def cache(url: str, content, params={}, headers={}, overwrite: bool = False):
     file_name: str = get_cache_name(url, params, headers)
     if not ENABLE_CACHING or (not overwrite and isfile(file_name)):
         return
-    file = open(file_name, "w")
-    file.write(content)
-    file.close()
+    with open(file_name, "w", encoding="utf-8") as file:
+        file.write(content)
 
 
 def remove_cache(url: str, params={}, headers={}):

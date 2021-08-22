@@ -23,6 +23,8 @@ def event_filter(event: Dict) -> bool:
         groups: List[str] = event["groups"]
         if "grid" in groups:
             return False
+        if "iwo" in groups:
+            return True
         if "rlcs" in groups or "rlrs" in groups:
             return True
     if "prize" in event:
