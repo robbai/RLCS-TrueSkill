@@ -7,7 +7,7 @@ from pyperclip import copy as clipboard
 from trueskill import Rating, TrueSkill
 
 from kelly import get_best_bet
-from ranking import setup_ranking
+from ranking import setup_ranking, fix_player_name
 
 
 # https://github.com/sublee/trueskill/issues/1#issuecomment-149762508
@@ -55,9 +55,10 @@ def input_players(
             continue
         for index in range(3):
             while True:
-                name = input(
+                name: str = input(
                     "Player " + str(index + 1) + " on " + team_names[team] + ": "
-                ).title()
+                )
+                name = fix_player_name(name)
                 if name in rankings:
                     ratings[team].append(rankings[name])
                     break

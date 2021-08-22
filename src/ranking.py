@@ -1,6 +1,6 @@
 from re import sub
 from json import loads as parse_json
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from datetime import datetime as dtime
 from datetime import timedelta
 
@@ -35,7 +35,7 @@ def event_filter(event: Dict) -> bool:
 
 
 def fix_player_name(name: str) -> str:
-    return sub(r"[^a-zA-Z0-9\- ]+", "", name.replace("_", " "))
+    return sub(r"[^a-zA-Z0-9\- ]+", "", name.strip().title().replace("_", " "))
 
 
 def parse_event_date(event: Dict):
@@ -60,7 +60,7 @@ def get_matches() -> List[Tuple[str, int, bool]]:
             print("\n")
             break
         page += 1
-    events.sort(key=parse_event_date)  # Octane's sorting is temperamental.
+    events.sort(key=parse_event_date)
     print(*[event["name"] for event in events], sep="\n")
     print()
 
@@ -74,13 +74,11 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         should_cache: bool = (
             isoparse(event_json["endDate"]).replace(tzinfo=None) < CACHE_TIME
         )
-        matches += [
-            (match, should_cache, event_json["_id"])
-            for match in matches_json["matches"]
-        ]
+        matches += [(match, should_cache) for match in matches_json["matches"]]
         if should_cache:
             cache(url, matches_content, params=params)
 
+    matches.sort(key=lambda match: isoparse(match[0]["date"]))
     return matches
 
 
@@ -140,22 +138,20 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]) -> List[List[floa
     series_total: List[List[List[int]]] = []
 
     # Iterate through matches.
-    for match_json, should_cache, event_id in tqdm(get_matches(), desc="Matches"):
+    for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
         series: List[int] = [0, 0]
         for game_json, winner in result_gen(match_json, should_cache):
-            if max(series) >= 7:
-                print(series, match_json["_id"], event_id)
             names: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
 
             for team, colour in enumerate(("blue", "orange")):
                 for player in game_json[colour]["players"]:
-                    title_name: str = player["player"]["tag"].title().strip()
-                    title_name = fix_player_name(title_name)
-                    names[team].append(title_name)
-                    if title_name not in rankings:
-                        rankings[title_name] = env.create_rating()
-                    ratings[team].append(rankings[title_name])
+                    name: str = player["player"]["tag"]
+                    name = fix_player_name(name)
+                    names[team].append(name)
+                    if name not in rankings:
+                        rankings[name] = env.create_rating()
+                    ratings[team].append(rankings[name])
 
             if any(len(named) != 3 for named in names):
                 break
