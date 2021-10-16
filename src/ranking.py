@@ -62,6 +62,11 @@ def get_matches() -> List[Tuple[str, int, bool]]:
             print("\n")
             break
         page += 1
+    events = [
+        event
+        for event in events
+        if isoparse(event["startDate"]).replace(tzinfo=None) <= dtime.now()
+    ]
     events.sort(key=parse_event_date)
     print(*[event["name"] for event in events], sep="\n")
     print()
