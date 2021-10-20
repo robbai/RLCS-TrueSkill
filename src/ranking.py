@@ -95,8 +95,6 @@ def update_rankings(
     ratings: List[List[Rating]],
     names: List[List[str]],
     winner: int,
-    series: List[int],
-    series_total: List[List[List[int]]],
 ):
     # Update rankings.
     ranks = [1, 1]
@@ -105,16 +103,6 @@ def update_rankings(
     for i in range(2):
         for j, name in enumerate(names[i]):
             rankings[name] = new_ratings[i][j]
-
-    # Update series.
-    if len(series_total) <= max(series):
-        for s in series_total:
-            s.append([0, 0])
-        series_total.append([[0, 0] for _ in range(max(series) + 1)])
-    series_total[series[winner]][series[not winner]][0] += 1
-    series_total[series[winner]][series[not winner]][1] += 1
-    series_total[series[not winner]][series[winner]][1] += 1
-    series[winner] += 1
 
 
 def result_gen(match_json, should_cache):
@@ -141,12 +129,9 @@ def result_gen(match_json, should_cache):
         yield game, "winner" in game["orange"]
 
 
-def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]) -> List[List[float]]:
-    series_total: List[List[List[int]]] = []
-
+def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
     # Iterate through matches.
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
-        series: List[int] = [0, 0]
         for game_json, winner in result_gen(match_json, should_cache):
             names: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
@@ -163,9 +148,4 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]) -> List[List[floa
             if any(len(named) != 3 for named in names):
                 break
 
-            update_rankings(env, rankings, ratings, names, winner, series, series_total)
-
-    series_rates: List[List[float]] = [
-        [(rate[0] + 1) / (rate[1] + 2) for rate in series] for series in series_total
-    ]
-    return series_rates
+            update_rankings(env, rankings, ratings, names, winner)
