@@ -29,9 +29,9 @@ def win_probability_best_of(
         return probability
 
     m_best_of: Dict[int, float] = {
-        3: 12.932017010012988,
-        5: 19.374327643101946,
-        7: 21.01782242281867,
+        3: 4.81061939677,
+        5: 7.95508448474,
+        7: 10.5322575142,
     }
     best_of = min(best_of, max(m_best_of))
 
