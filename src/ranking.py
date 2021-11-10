@@ -17,6 +17,25 @@ CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(days=30)
 
 cc: CurrencyConverter = CurrencyConverter()
 
+REGION_MU: Dict[str, float] = {
+    "NA": 33.528,
+    "EU": 37.354,
+    "INT": 28.309,
+    "OCE": 16.002,
+    "SAM": 11.580,
+    "ME": 18,  # TODO
+    "ASIA": 10,  # TODO
+    "AF": 6,  # TODO
+}
+
+REGION_SIGMA: Dict[str, float] = {
+    "NA": -13.6725,
+    "EU": -15.0453,
+    "INT": -19.2944,
+    "OCE": -14.1841,
+    "SAM": -19.3765,
+}
+
 
 def event_filter(event: Dict) -> bool:
     if "groups" in event:
@@ -133,6 +152,11 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
     # Iterate through matches.
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
         for game_json, winner in result_gen(match_json, should_cache):
+            if "event" in game_json:
+                region: str = game_json["event"]["region"]
+            else:
+                region: str = game_json["match"]["event"]["region"]
+
             names: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
 
@@ -142,7 +166,13 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                     name = fix_player_name(name)
                     names[team].append(name)
                     if name not in rankings:
-                        rankings[name] = env.create_rating()
+                        mu: float = REGION_MU[region] if region in REGION_MU else env.mu
+                        sigma: float = (
+                            REGION_SIGMA[region]
+                            if region in REGION_SIGMA
+                            else env.sigma
+                        )
+                        rankings[name] = env.create_rating(mu, sigma)
                     ratings[team].append(rankings[name])
 
             if any(len(named) != 3 for named in names):
