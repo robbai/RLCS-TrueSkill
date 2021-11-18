@@ -91,18 +91,17 @@ def get_matches() -> List[Tuple[str, int, bool]]:
     print()
 
     # Iterate through events.
-    url: str = "https://zsr.octane.gg/matches"
     matches: List = []
     for event_json in tqdm(events, desc="Events"):
-        params: Dict = {"event": event_json["_id"]}
-        matches_content: str = get_content(url, params=params)
+        url: str = f"https://zsr.octane.gg/events/{event_json['slug']}/matches"
+        matches_content: str = get_content(url)
         matches_json: Dict = parse_json(matches_content)
         should_cache: bool = (
             isoparse(event_json["endDate"]).replace(tzinfo=None) < CACHE_TIME
         )
         matches += [(match, should_cache) for match in matches_json["matches"]]
         if should_cache:
-            cache(url, matches_content, params=params)
+            cache(url, matches_content)
 
     matches.sort(key=lambda match: isoparse(match[0]["date"]))
     return matches
