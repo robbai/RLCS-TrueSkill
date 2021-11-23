@@ -12,7 +12,7 @@ from currency_converter import CurrencyConverter
 from requester import cache, get_content
 
 # Cache events and matches that are older than this.
-CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(days=30)
+CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 
 
 cc: CurrencyConverter = CurrencyConverter()
