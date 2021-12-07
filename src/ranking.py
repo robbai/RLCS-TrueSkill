@@ -38,6 +38,9 @@ REGION_SIGMA: Dict[str, float] = {
 
 
 def event_filter(event: Dict) -> bool:
+    if event["region"] == "INT":
+        if event["tier"] in ["S", "A", "B"]:
+            return True
     if "groups" in event:
         groups: List[str] = event["groups"]
         if "grid" in groups:
