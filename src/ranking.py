@@ -17,23 +17,15 @@ CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 
 cc: CurrencyConverter = CurrencyConverter()
 
-REGION_MU: Dict[str, float] = {
-    "NA": 33.528,
-    "EU": 37.354,
-    "INT": 28.309,
-    "OCE": 16.002,
-    "SAM": 11.580,
-    "ME": 18,  # TODO
-    "ASIA": 10,  # TODO
-    "AF": 6,  # TODO
-}
-
-REGION_SIGMA: Dict[str, float] = {
-    "NA": -13.6725,
-    "EU": -15.0453,
-    "INT": -19.2944,
-    "OCE": -14.1841,
-    "SAM": -19.3765,
+REGION_RATING: Dict[str, float] = {
+    "NA": (53.8507, -12.0396),
+    "EU": (56.0847, -9.4718),
+    "INT": (27.0944, -24.6955),
+    "OCE": (27.4025, -23.1297),
+    "SAM": (32.2324, -13.8960),
+    "ME": (24.1726, -13.2583),
+    "ASIA": (19.0171, -18.9193),
+    "AF": (9.5971, -10.8331),
 }
 
 
@@ -168,13 +160,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                     name = fix_player_name(name)
                     names[team].append(name)
                     if name not in rankings:
-                        mu: float = REGION_MU[region] if region in REGION_MU else env.mu
-                        sigma: float = (
-                            REGION_SIGMA[region]
-                            if region in REGION_SIGMA
-                            else env.sigma
-                        )
-                        rankings[name] = env.create_rating(mu, sigma)
+                        rankings[name] = env.create_rating(*REGION_RATING[region])
                     ratings[team].append(rankings[name])
 
             if any(len(named) != 3 for named in names):
