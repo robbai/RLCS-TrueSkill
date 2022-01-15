@@ -18,21 +18,18 @@ CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 cc: CurrencyConverter = CurrencyConverter()
 
 REGION_RATING: Dict[str, float] = {
-    "NA": (53.8507, -12.0396),
-    "EU": (56.0847, -9.4718),
-    "INT": (27.0944, -24.6955),
-    "OCE": (27.4025, -23.1297),
-    "SAM": (32.2324, -13.8960),
-    "ME": (24.1726, -13.2583),
-    "ASIA": (19.0171, -18.9193),
-    "AF": (9.5971, -10.8331),
+    "NA": (91.8828, -12.0396),
+    "EU": (108.2387, -9.4718),
+    "INT": (64.6425, -24.6955),
+    "OCE": (79.8350, -23.1297),
+    "SAM": (84.2898, -13.8960),
+    "ME": (81.3772, -13.2583),
+    "ASIA": (13.0664, -18.9193),
+    "AF": (5.1691, -10.8331),
 }
 
 
 def event_filter(event: Dict) -> bool:
-    if event["region"] == "INT":
-        if event["tier"] in ["S", "A", "B"]:
-            return True
     if "groups" in event:
         groups: List[str] = event["groups"]
         if "grid" in groups:
