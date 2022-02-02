@@ -1,5 +1,6 @@
 from re import sub
 from json import loads as parse_json
+from math import log
 from typing import Dict, List, Tuple
 from datetime import datetime as dtime
 from datetime import timedelta
@@ -10,6 +11,7 @@ from dateutil.parser import isoparse
 from currency_converter import CurrencyConverter
 
 from requester import cache, get_content
+from probability import win_probability_best_of
 
 # Cache events and matches that are older than this.
 CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
@@ -82,8 +84,6 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         if isoparse(event["startDate"]).replace(tzinfo=None) <= dtime.now()
     ]
     events.sort(key=parse_event_date)
-    print(*[event["name"] for event in events], sep="\n")
-    print()
 
     # Iterate through events.
     matches: List = []
@@ -94,6 +94,8 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         should_cache: bool = (
             isoparse(event_json["endDate"]).replace(tzinfo=None) < CACHE_TIME
         )
+        # if not should_cache:
+        #     break
         matches += [(match, should_cache) for match in matches_json["matches"]]
         if should_cache:
             cache(url, matches_content)
@@ -108,7 +110,13 @@ def update_rankings(
     ratings: List[List[Rating]],
     names: List[List[str]],
     winner: int,
+    result=None,
 ):
+    error = None
+    if result:
+        probability: float = win_probability_best_of(env, result[0], *ratings)
+        error = 1 - probability if result[1] else probability
+
     # Update rankings.
     ranks = [1, 1]
     ranks[winner] = 0
@@ -116,6 +124,8 @@ def update_rankings(
     for i in range(2):
         for j, name in enumerate(names[i]):
             rankings[name] = new_ratings[i][j]
+
+    return error
 
 
 def result_gen(match_json, should_cache):
@@ -143,9 +153,16 @@ def result_gen(match_json, should_cache):
 
 
 def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
+    arr = []
+
     # Iterate through matches.
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
-        for game_json, winner in result_gen(match_json, should_cache):
+        result = (
+            (match_json["format"]["length"], "winner" in match_json["orange"])
+            if "orange" in match_json
+            else None
+        )
+        for i, (game_json, winner) in enumerate(result_gen(match_json, should_cache)):
             if "event" in game_json:
                 region: str = game_json["event"]["region"]
             else:
@@ -166,4 +183,14 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
             if any(len(named) != 3 for named in names):
                 break
 
-            update_rankings(env, rankings, ratings, names, winner)
+            error = update_rankings(
+                env, rankings, ratings, names, winner, None if i else result
+            )
+            if error:
+                arr.append((match_json["slug"], error))
+
+    print("Upsets:")
+    arr.sort(key=lambda a: a[-1])
+    print(*arr[:100], sep="\n")
+    print("\nExpected:")
+    print(*arr[::-1][:100], sep="\n")
