@@ -48,7 +48,7 @@ def event_filter(event: Dict) -> bool:
 
 
 def fix_player_name(name: str) -> str:
-    return sub(r"[^a-zA-Z0-9\- ]+", "", name.strip().title().replace("_", " "))
+    return sub(r"[^a-zA-Z0-9\- ]+", "", name.replace("_", " ").strip()).title()
 
 
 def parse_event_date(event: Dict):
