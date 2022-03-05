@@ -1,13 +1,38 @@
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 
 from tabulate import tabulate
 from pyperclip import copy as clipboard
 from trueskill import Rating, TrueSkill
 
 from kelly import get_best_bet
-from player import Player
-from ranking import setup_ranking, fix_player_name
+from player import Player, fix_player_name
+from ranking import setup_ranking
 from probability import win_probability_best_of
+
+
+def get_by_name(rankings: Dict[str, Player], name: str):
+    name = fix_player_name(name)
+    players: List[Player] = [
+        player for player in rankings.values() if player.name == name
+    ]
+    if not players:
+        return None
+    if len(players) == 1:
+        return players[0]
+    print(f"Found {len(players)} players named {name}:")
+    print(
+        *[
+            f"#{i + 1} - {name} ({player.region}): {player.slug}"
+            for i, player in enumerate(players)
+        ],
+        sep="\n",
+    )
+    while True:
+        try:
+            selected: int = int(input("Select: "))
+            return players[selected - 1]
+        except (ValueError, IndexError):
+            print("Invalid selection.")
 
 
 def input_players(
@@ -23,9 +48,9 @@ def input_players(
                 name: str = input(
                     "Player " + str(index + 1) + " on " + team_names[team] + ": "
                 )
-                name = fix_player_name(name)
-                if name in rankings:
-                    ratings[team].append(rankings[name].rating)
+                player: Optional[Player] = get_by_name(rankings, name)
+                if player:
+                    ratings[team].append(player.rating)
                     break
                 else:
                     print("Couldn't find player")
@@ -54,13 +79,19 @@ def main():
 
     # Print the leaderboard.
     leaderboard: List[Tuple[str, float, float]] = []
-    for name, player in sorted(
+    for slug, player in sorted(
         rankings.items(),
-        key=lambda name_player: name_player[1].rating.mu,
+        key=lambda slug_player: slug_player[1].rating.mu,
         reverse=True,
     ):
         leaderboard.append(
-            (name, player.region, player.rating.mu, player.rating.sigma, player.debut)
+            (
+                player.name,
+                player.region,
+                player.rating.mu,
+                player.rating.sigma,
+                player.debut,
+            )
         )
     print(tabulate(leaderboard, headers=["Name", "Region", "Mu", "Sigma", "Debut"]))
     print()

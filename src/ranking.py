@@ -1,4 +1,3 @@
-from re import sub
 from json import loads as parse_json
 from typing import Dict, List, Tuple
 from datetime import datetime as dtime
@@ -35,10 +34,6 @@ def event_filter(event: Dict) -> bool:
             prize_pool: int = cc.convert(prize["amount"], prize["currency"], "USD")
         return prize_pool >= 50000
     return False
-
-
-def fix_player_name(name: str) -> str:
-    return sub(r"[^a-zA-Z0-9\- ]+", "", name.replace("_", " ").strip()).title()
 
 
 def parse_event_date(event: Dict):
@@ -93,7 +88,7 @@ def update_rankings(
     env: TrueSkill,
     rankings: Dict[str, Player],
     ratings: List[List[Rating]],
-    names: List[List[str]],
+    slugs: List[List[str]],
     winner: int,
 ):
     # Update rankings.
@@ -101,8 +96,8 @@ def update_rankings(
     ranks[winner] = 0
     new_ratings = env.rate(ratings, ranks)
     for i in range(2):
-        for j, name in enumerate(names[i]):
-            rankings[name].rating = new_ratings[i][j]
+        for j, slug in enumerate(slugs[i]):
+            rankings[slug].rating = new_ratings[i][j]
 
 
 def result_gen(match_json, should_cache):
@@ -138,24 +133,24 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
             else:
                 region: str = game_json["match"]["event"]["region"]
 
-            names: List[List[str]] = [[], []]
+            slugs: List[List[str]] = [[], []]
             ratings: List[List[Rating]] = [[], []]
 
             for team, colour in enumerate(("blue", "orange")):
                 for player in game_json[colour]["players"]:
-                    name: str = player["player"]["tag"]
-                    name = fix_player_name(name)
-                    names[team].append(name)
-                    if name not in rankings:
-                        rankings[name] = Player(name, region, env)
-                        rankings[name].debut = (
+                    slug: str = player["player"]["slug"]
+                    slugs[team].append(slug)
+                    if slug not in rankings:
+                        player: Player = Player(slug, region, env)
+                        player.debut = (
                             game_json["event"]["name"]
                             if "event" in game_json
                             else game_json["match"]["event"]["name"]
                         )
-                    ratings[team].append(rankings[name].rating)
+                        rankings[slug] = player
+                    ratings[team].append(rankings[slug].rating)
 
-            if any(len(named) != 3 for named in names):
+            if any(len(roster) != 3 for roster in slugs):
                 break
 
-            update_rankings(env, rankings, ratings, names, winner)
+            update_rankings(env, rankings, ratings, slugs, winner)
