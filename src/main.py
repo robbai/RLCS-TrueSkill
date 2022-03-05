@@ -5,12 +5,13 @@ from pyperclip import copy as clipboard
 from trueskill import Rating, TrueSkill
 
 from kelly import get_best_bet
+from player import Player
 from ranking import setup_ranking, fix_player_name
 from probability import win_probability_best_of
 
 
 def input_players(
-    team_names: List[str], rankings: Dict[str, Rating], teams: Dict[str, List[Rating]]
+    team_names: List[str], rankings: Dict[str, Player], teams: Dict[str, List[Rating]]
 ):
     ratings: List[List[Rating]] = [[], []]
     for team in range(2):
@@ -24,7 +25,7 @@ def input_players(
                 )
                 name = fix_player_name(name)
                 if name in rankings:
-                    ratings[team].append(rankings[name])
+                    ratings[team].append(rankings[name].rating)
                     break
                 else:
                     print("Couldn't find player")
@@ -46,20 +47,22 @@ def main():
     env: TrueSkill = TrueSkill(
         sigma=-15.5676, beta=35.1108, tau=0.7317, draw_probability=0, backend="mpmath"
     )
-    rankings: Dict[str, Rating] = {}
+    rankings: Dict[str, Player] = {}
     setup_ranking(env, rankings)
 
     print()
 
     # Print the leaderboard.
     leaderboard: List[Tuple[str, float, float]] = []
-    for player in sorted(
+    for name, player in sorted(
         rankings.items(),
-        key=lambda player: player[1].mu,
+        key=lambda name_player: name_player[1].rating.mu,
         reverse=True,
     ):
-        leaderboard.append((player[0], player[1].mu, player[1].sigma))
-    print(tabulate(leaderboard, headers=["Name", "Mu", "Sigma"]))
+        leaderboard.append(
+            (name, player.region, player.rating.mu, player.rating.sigma, player.debut)
+        )
+    print(tabulate(leaderboard, headers=["Name", "Region", "Mu", "Sigma", "Debut"]))
     print()
 
     # Dictionary of team names to rankings.

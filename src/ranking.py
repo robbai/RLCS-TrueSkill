@@ -9,6 +9,7 @@ from trueskill import Rating, TrueSkill
 from dateutil.parser import isoparse
 from currency_converter import CurrencyConverter
 
+from player import Player
 from requester import cache, get_content
 
 # Cache events and matches that are older than this.
@@ -16,17 +17,6 @@ CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 
 
 cc: CurrencyConverter = CurrencyConverter()
-
-REGION_RATING: Dict[str, float] = {
-    "NA": (91.8828, -12.0396),
-    "EU": (108.2387, -9.4718),
-    "INT": (64.6425, -24.6955),
-    "OCE": (79.8350, -23.1297),
-    "SAM": (84.2898, -13.8960),
-    "ME": (81.3772, -13.2583),
-    "ASIA": (13.0664, -18.9193),
-    "AF": (5.1691, -10.8331),
-}
 
 
 def event_filter(event: Dict) -> bool:
@@ -101,7 +91,7 @@ def get_matches() -> List[Tuple[str, int, bool]]:
 
 def update_rankings(
     env: TrueSkill,
-    rankings: Dict[str, Rating],
+    rankings: Dict[str, Player],
     ratings: List[List[Rating]],
     names: List[List[str]],
     winner: int,
@@ -112,7 +102,7 @@ def update_rankings(
     new_ratings = env.rate(ratings, ranks)
     for i in range(2):
         for j, name in enumerate(names[i]):
-            rankings[name] = new_ratings[i][j]
+            rankings[name].rating = new_ratings[i][j]
 
 
 def result_gen(match_json, should_cache):
@@ -139,7 +129,7 @@ def result_gen(match_json, should_cache):
         yield game, "winner" in game["orange"]
 
 
-def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
+def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
     # Iterate through matches.
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
         for game_json, winner in result_gen(match_json, should_cache):
@@ -157,8 +147,13 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Rating]):
                     name = fix_player_name(name)
                     names[team].append(name)
                     if name not in rankings:
-                        rankings[name] = env.create_rating(*REGION_RATING[region])
-                    ratings[team].append(rankings[name])
+                        rankings[name] = Player(name, region, env)
+                        rankings[name].debut = (
+                            game_json["event"]["name"]
+                            if "event" in game_json
+                            else game_json["match"]["event"]["name"]
+                        )
+                    ratings[team].append(rankings[name].rating)
 
             if any(len(named) != 3 for named in names):
                 break
