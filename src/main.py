@@ -70,7 +70,7 @@ def input_ratios(teams: List[str]) -> Tuple[float, float]:
 def main():
     # Setup the ranking.
     env: TrueSkill = TrueSkill(
-        sigma=-15.5676, beta=35.1108, tau=0.7317, draw_probability=0, backend="mpmath"
+        beta=32.5665, tau=0.47127, draw_probability=0, backend="mpmath"
     )
     rankings: Dict[str, Player] = {}
     setup_ranking(env, rankings)
