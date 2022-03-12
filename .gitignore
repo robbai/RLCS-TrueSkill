@@ -2,6 +2,7 @@
 src/cache*/*
 !src/cache/__init__.py
 src/manual.txt
+src/logs.json
 
 # IntelliJ
 .idea/
