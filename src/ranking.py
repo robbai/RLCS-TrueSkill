@@ -1,4 +1,5 @@
 from json import loads as parse_json
+from math import log
 from typing import Dict, List, Tuple
 from datetime import datetime as dtime
 from datetime import timedelta
@@ -10,12 +11,19 @@ from currency_converter import CurrencyConverter
 
 from player import Player, dedupe_slug
 from requester import cache, get_content
+from probability import win_probability
 
 # Cache events and matches that are older than this.
 CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 
 
 cc: CurrencyConverter = CurrencyConverter()
+
+
+MAJOR_NAME: str = "RLCS 2021-22 Winter Major"
+all_games: List = []
+total_games: int = 0
+total_loss: float = 0
 
 
 def event_filter(event: Dict) -> bool:
@@ -53,9 +61,7 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         )
         events_json: Dict = parse_json(events_content)
         events += [event for event in events_json["events"] if event_filter(event)]
-        print(end=f"\rRequesting Events: {len(events)} Events")
         if events_json["pageSize"] != per_page:
-            print("\n")
             break
         page += 1
     events = [
@@ -63,9 +69,12 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         for event in events
         if isoparse(event["startDate"]).replace(tzinfo=None) <= dtime.now()
     ]
-    events.sort(key=parse_event_date)
-    print(*[event["name"] for event in events], sep="\n")
-    print()
+    events = sorted(events, key=parse_event_date)
+    events = events[
+        : 1 + next((i for i in range(len(events)) if events[i]["name"] == MAJOR_NAME))
+    ]
+    # print(*[event["name"] for event in events], sep="\n")
+    # exit()
 
     # Iterate through events.
     matches: List = []
@@ -90,7 +99,19 @@ def update_rankings(
     slugs: List[List[str]],
     winner: int,
     date: dtime = None,
+    weight: float = 1,
 ):
+    if weight > 0:
+        players: List[List[Rating]] = [
+            [rankings[slug] for slug in roster] for roster in slugs
+        ]
+        probability: float = win_probability(env, *players, date)
+        loss: float = -((not winner) * log(probability) + winner * log(1 - probability))
+        global total_loss, total_games
+        total_loss += loss * weight
+        total_games += weight
+
+    # Update rankings.
     ranks = [1, 1]
     ranks[winner] = 0
     ratings: List[List[Rating]] = [
@@ -126,32 +147,50 @@ def result_gen(match_json, should_cache):
         yield game, "winner" in game["orange"]
 
 
-def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
-    # Iterate through matches.
+def games_gen():
+    if all_games:
+        return all_games
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
         date: dtime = isoparse(match_json["date"])
-        for game_json, winner in result_gen(match_json, should_cache):
-            if "event" in game_json:
-                region: str = game_json["event"]["region"]
-            else:
-                region: str = game_json["match"]["event"]["region"]
+        for result in result_gen(match_json, should_cache):
+            all_games.append((date, result))
+    return all_games
 
-            slugs: List[List[str]] = [[], []]
 
-            for team, colour in enumerate(("blue", "orange")):
-                for player in game_json[colour]["players"]:
-                    slug: str = dedupe_slug(player["player"]["slug"])
-                    slugs[team].append(slug)
-                    if slug not in rankings:
-                        player: Player = Player(slug, region, env)
-                        player.debut = (
-                            game_json["event"]["name"]
-                            if "event" in game_json
-                            else game_json["match"]["event"]["name"]
-                        )
-                        rankings[slug] = player
+def setup_ranking(env: TrueSkill):
+    global total_loss, total_games
+    total_loss = total_games = 0
 
-            if any(len(roster) != 3 for roster in slugs):
-                break
+    rankings: Dict[str, Player] = {}
 
-            update_rankings(env, rankings, slugs, winner, date)
+    # Iterate through games.
+    for date, (game_json, winner) in games_gen():
+        if "event" in game_json:
+            region: str = game_json["event"]["region"]
+            event_name: str = game_json["event"]["name"]
+        else:
+            region: str = game_json["match"]["event"]["region"]
+            event_name: str = game_json["match"]["event"]["name"]
+        weight: float = 2 if event_name == MAJOR_NAME else 1
+
+        slugs: List[List[str]] = [[], []]
+
+        for team, colour in enumerate(("blue", "orange")):
+            for player in game_json[colour]["players"]:
+                slug: str = dedupe_slug(player["player"]["slug"])
+                slugs[team].append(slug)
+                if slug not in rankings:
+                    player: Player = Player(slug, region, env)
+                    player.debut = (
+                        game_json["event"]["name"]
+                        if "event" in game_json
+                        else game_json["match"]["event"]["name"]
+                    )
+                    rankings[slug] = player
+
+        if any(len(roster) != 3 for roster in slugs):
+            continue
+
+        update_rankings(env, rankings, slugs, winner, date, weight)
+
+    return total_loss / max(1, total_games)
