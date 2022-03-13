@@ -123,7 +123,19 @@ def main():
                 + str(best_of)
                 + ": "
                 + str(round(max(probability, 1 - probability) * 100, 2)).rjust(6)
-                + "% (Bet "
+                + "% ["
+                + str(best_of // 2 + 1)
+                + "-"
+                + next(
+                    (
+                        str(games)
+                        for games in range(best_of // 2)
+                        if max(probability, 1 - probability)
+                        > 1 - (0.5 + games) / (best_of // 2 + 1.5 + games)
+                    ),
+                    str(best_of // 2),
+                )
+                + "] (Bet "
                 + str(round(abs(best_bet) * 100, 2)).rjust(6)
                 + "% on "
                 + team_names[0 if best_bet > 0 else 1].rjust(
