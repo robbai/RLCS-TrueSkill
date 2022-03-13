@@ -113,7 +113,7 @@ def main():
             + ", 1:"
             + str(round(ratios[1], 4)),
         ]
-        for best_of in range(1, 8, 2):
+        for best_of in range(3, 8, 2):
             probability: float = win_probability_best_of(env, best_of, *ratings)
             best_bet: float = get_best_bet(probability, ratios)
             output.append(
