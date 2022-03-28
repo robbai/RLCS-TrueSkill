@@ -90,14 +90,14 @@ def update_rankings(
     ratings: List[List[Rating]],
     slugs: List[List[str]],
     winner: int,
+    date: dtime = None,
 ):
-    # Update rankings.
     ranks = [1, 1]
     ranks[winner] = 0
     new_ratings = env.rate(ratings, ranks)
     for i in range(2):
         for j, slug in enumerate(slugs[i]):
-            rankings[slug].rating = new_ratings[i][j]
+            rankings[slug].update(new_ratings[i][j], date)
 
 
 def result_gen(match_json, should_cache):
@@ -153,4 +153,5 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
             if any(len(roster) != 3 for roster in slugs):
                 break
 
-            update_rankings(env, rankings, ratings, slugs, winner)
+            date: dtime = isoparse(game_json["date"])
+            update_rankings(env, rankings, ratings, slugs, winner, date)

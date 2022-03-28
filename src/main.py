@@ -1,8 +1,9 @@
 from typing import Dict, List, Tuple, Optional
+from datetime import datetime as dtime
 
 from tabulate import tabulate
 from pyperclip import copy as clipboard
-from trueskill import Rating, TrueSkill
+from trueskill import TrueSkill
 
 from kelly import get_best_bet
 from player import Player, fix_player_name
@@ -36,12 +37,12 @@ def get_by_name(rankings: Dict[str, Player], name: str):
 
 
 def input_players(
-    team_names: List[str], rankings: Dict[str, Player], teams: Dict[str, List[Rating]]
-):
-    ratings: List[List[Rating]] = [[], []]
+    team_names: List[str], rankings: Dict[str, Player], teams: Dict[str, List[Player]]
+) -> List[List[Player]]:
+    players: List[List[Player]] = [[], []]
     for team in range(2):
         if team_names[team] in teams:
-            ratings[team] = teams[team_names[team]]
+            players[team] = teams[team_names[team]]
             continue
         for index in range(3):
             while True:
@@ -50,12 +51,12 @@ def input_players(
                 )
                 player: Optional[Player] = get_by_name(rankings, name)
                 if player:
-                    ratings[team].append(player.rating)
+                    players[team].append(player)
                     break
                 else:
                     print("Couldn't find player")
-        teams[team_names[team]] = ratings[team]
-    return ratings
+        teams[team_names[team]] = players[team]
+    return players
 
 
 def input_ratios(teams: List[str]) -> Tuple[float, float]:
@@ -90,21 +91,22 @@ def main():
                 player.region,
                 player.rating.mu,
                 player.rating.sigma,
-                player.debut,
+                player.momentum,
             )
         )
-    print(tabulate(leaderboard, headers=["Name", "Region", "Mu", "Sigma", "Debut"]))
+    print(tabulate(leaderboard, headers=["Name", "Region", "Mu", "Sigma", "Momentum"]))
     print()
 
     # Dictionary of team names to rankings.
-    teams: Dict[str, List[Rating]] = {}
+    teams: Dict[str, List[Player]] = {}
 
     # Input loop
+    date: dtime = dtime.now()
     while True:
         team_names: List[str] = [
             input("Team " + str(i + 1) + ": ").upper() for i in range(2)
         ]
-        ratings: List[List[Rating]] = input_players(team_names, rankings, teams)
+        players: List[List[Player]] = input_players(team_names, rankings, teams)
         ratios: Tuple[float, float] = input_ratios(team_names)
         output: List[str] = [
             " " + team_names[0] + " vs " + team_names[1],
@@ -114,7 +116,7 @@ def main():
             + str(round(ratios[1], 4)),
         ]
         for best_of in range(3, 8, 2):
-            probability: float = win_probability_best_of(env, best_of, *ratings)
+            probability: float = win_probability_best_of(env, best_of, *players, date)
             best_bet: float = get_best_bet(probability, ratios)
             output.append(
                 ("+" if (probability > 0.5) == (best_bet > 0) else "-")

@@ -1,5 +1,6 @@
 from re import sub
-from typing import Dict
+from typing import Dict, Union, Optional
+from datetime import datetime as dtime
 
 from trueskill import Rating, TrueSkill
 
@@ -27,6 +28,12 @@ def name_from_slug(slug: str):
     return fix_player_name(slug[slug.index("-") + 1 :])
 
 
+def different_date(d1: Optional[dtime], d2: Optional[dtime]):
+    if (not d1) != (not d2):
+        return True
+    return d1.day != d2.day or d1.month != d2.month or d1.year != d2.year
+
+
 class Player:
     def __init__(self, slug: str, region: str, env: TrueSkill):
         self.slug: str = slug
@@ -34,3 +41,20 @@ class Player:
         self.region: str = region
         self.rating: Rating = env.create_rating(*REGION_RATING[region])
         self.debut: str = "Unknown"
+        self.last_played: Optional[dtime] = None
+        self.momentum: float = 0  # Total mu change today.
+
+    def update(self, rating: Rating, date: Optional[dtime] = None):
+        if different_date(self.last_played, date):
+            self.reset(date)
+        self.momentum += rating.mu - self.rating.mu
+        self.rating = rating
+
+    def reset(self, date: Optional[dtime] = None):
+        self.last_played = date
+        self.momentum = 0
+
+    def get_momentum(self, date: Union[bool, dtime]):
+        if isinstance(date, bool):
+            return self.momentum * date
+        return 0 if different_date(self.last_played, date) else self.momentum
