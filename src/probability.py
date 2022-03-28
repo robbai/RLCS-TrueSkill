@@ -42,5 +42,5 @@ def win_probability_best_of(
     :return: The probability of "team1" winning the match
     """
     assert best_of % 2 and best_of > 0, best_of
-    beta_factor: float = {3: 1.68533, 5: 0.35714, 7: 0.20904}[best_of]
+    beta_factor: float = {3: 1.44214, 5: 0.39479, 7: 0.21843}[best_of]
     return win_probability(env, team1, team2, date, beta_factor)
