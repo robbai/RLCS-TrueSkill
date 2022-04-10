@@ -87,13 +87,15 @@ def get_matches() -> List[Tuple[str, int, bool]]:
 def update_rankings(
     env: TrueSkill,
     rankings: Dict[str, Player],
-    ratings: List[List[Rating]],
     slugs: List[List[str]],
     winner: int,
     date: dtime = None,
 ):
     ranks = [1, 1]
     ranks[winner] = 0
+    ratings: List[List[Rating]] = [
+        [rankings[slug].rating for slug in roster] for roster in slugs
+    ]
     new_ratings = env.rate(ratings, ranks)
     for i in range(2):
         for j, slug in enumerate(slugs[i]):
@@ -134,7 +136,6 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
                 region: str = game_json["match"]["event"]["region"]
 
             slugs: List[List[str]] = [[], []]
-            ratings: List[List[Rating]] = [[], []]
 
             for team, colour in enumerate(("blue", "orange")):
                 for player in game_json[colour]["players"]:
@@ -148,10 +149,9 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
                             else game_json["match"]["event"]["name"]
                         )
                         rankings[slug] = player
-                    ratings[team].append(rankings[slug].rating)
 
             if any(len(roster) != 3 for roster in slugs):
                 break
 
             date: dtime = isoparse(game_json["date"])
-            update_rankings(env, rankings, ratings, slugs, winner, date)
+            update_rankings(env, rankings, slugs, winner, date)
