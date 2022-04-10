@@ -1,5 +1,5 @@
 from math import sqrt
-from typing import List, Union
+from typing import Dict, List, Union
 from datetime import datetime as dtime
 
 from trueskill import TrueSkill
@@ -7,6 +7,9 @@ from trueskill import TrueSkill
 from player import Player
 
 MOMENTUM_FACTOR: float = 0.19587
+
+
+params: Dict[int, float] = {1: 1e-12, 3: 1.75794, 5: 0.37771, 7: 0.20026, 9: 1e-12}
 
 
 def total_mu(team: List[Player], date: Union[bool, dtime]) -> float:
@@ -42,5 +45,4 @@ def win_probability_best_of(
     :return: The probability of "team1" winning the match
     """
     assert best_of % 2 and best_of > 0, best_of
-    beta_factor: float = {3: 1.75794, 5: 0.37771, 7: 0.20026}[best_of]
-    return win_probability(env, team1, team2, date, beta_factor)
+    return win_probability(env, team1, team2, date, params[best_of])

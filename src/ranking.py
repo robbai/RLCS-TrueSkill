@@ -1,6 +1,6 @@
 from json import loads as parse_json
-from math import log
-from typing import Dict, List, Tuple
+from math import log, copysign
+from typing import Dict, List, Tuple, Optional
 from datetime import datetime as dtime
 from datetime import timedelta
 
@@ -11,7 +11,7 @@ from currency_converter import CurrencyConverter
 
 from player import Player, dedupe_slug
 from requester import cache, get_content
-from probability import win_probability
+from probability import win_probability_best_of
 
 # Cache events and matches that are older than this.
 CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
@@ -22,8 +22,7 @@ cc: CurrencyConverter = CurrencyConverter()
 
 MAJOR_NAME: str = "RLCS 2021-22 Fall Major"
 all_games: List = []
-total_games: int = 0
-total_loss: float = 0
+losses: Dict[int, float] = None
 
 
 def event_filter(event: Dict) -> bool:
@@ -99,17 +98,23 @@ def update_rankings(
     slugs: List[List[str]],
     winner: int,
     date: dtime = None,
-    weight: float = 1,
+    best_of: Optional[Tuple[int, bool]] = None,
 ):
-    if weight > 0:
+    if best_of and 0 < best_of[0] < 10:
         players: List[List[Rating]] = [
             [rankings[slug] for slug in roster] for roster in slugs
         ]
-        probability: float = win_probability(env, *players, date)
-        loss: float = -((not winner) * log(probability) + winner * log(1 - probability))
-        global total_loss, total_games
-        total_loss += loss * weight
-        total_games += weight
+        probability: float = win_probability_best_of(env, best_of[0], *players, date)
+        global losses
+        losses[best_of[0]][0] += copysign(
+            -(not best_of[1]) / probability + (best_of[1]) / (1 - probability),
+            -1 if (probability < 0.5) == best_of[1] else 1,
+        )
+        losses[best_of[0]][1] += 1
+        loss: float = -(
+            (not best_of[1]) * log(probability) + best_of[1] * log(1 - probability)
+        )
+        losses[best_of[0]][2] += loss
 
     # Update rankings.
     ranks = [1, 1]
@@ -124,6 +129,11 @@ def update_rankings(
 
 
 def result_gen(match_json, should_cache):
+    best_of: Tuple[int, bool] = (
+        match_json["format"]["length"],
+        "winner" in match_json["orange"],
+    )
+
     # Check if we can quickly iterate through games without requesting them.
     if all(
         colour in match_json
@@ -133,7 +143,8 @@ def result_gen(match_json, should_cache):
     ):
         for game in match_json["games"]:
             if "duration" in game:
-                yield match_json, game["orange"] > game["blue"]
+                yield match_json, game["orange"] > game["blue"], best_of
+                best_of = None
         return
 
     url: str = f"https://zsr.octane.gg/matches/{match_json['_id']}/games"
@@ -144,7 +155,8 @@ def result_gen(match_json, should_cache):
 
     # Iterate through games.
     for game in games_json["games"]:
-        yield game, "winner" in game["orange"]
+        yield game, "winner" in game["orange"], best_of
+        best_of = None
 
 
 def games_gen():
@@ -157,21 +169,20 @@ def games_gen():
     return all_games
 
 
-def setup_ranking(env: TrueSkill):
-    global total_loss, total_games
-    total_loss = total_games = 0
+def setup_ranking(env: TrueSkill) -> Dict[int, Tuple[float, int, float]]:
+    global losses
+    losses = {1: [0, 0, 0], 3: [0, 0, 0], 5: [0, 0, 0], 7: [0, 0, 0], 9: [0, 0, 0]}
 
     rankings: Dict[str, Player] = {}
 
     # Iterate through games.
-    for date, (game_json, winner) in games_gen():
+    for date, (game_json, winner, best_of) in games_gen():
         if "event" in game_json:
             region: str = game_json["event"]["region"]
             event_name: str = game_json["event"]["name"]
         else:
             region: str = game_json["match"]["event"]["region"]
             event_name: str = game_json["match"]["event"]["name"]
-        weight: float = 10 if event_name == MAJOR_NAME else 1
 
         slugs: List[List[str]] = [[], []]
 
@@ -191,6 +202,6 @@ def setup_ranking(env: TrueSkill):
         if any(len(roster) != 3 for roster in slugs):
             continue
 
-        update_rankings(env, rankings, slugs, winner, date, weight)
+        update_rankings(env, rankings, slugs, winner, date, best_of)
 
-    return total_loss / max(1, total_games)
+    return losses
