@@ -6,7 +6,7 @@ from trueskill import TrueSkill
 
 from player import Player
 
-MOMENTUM_FACTOR: float = 0
+MOMENTUM_FACTOR: float = 0.19587
 
 
 def total_mu(team: List[Player], date: Union[bool, dtime]) -> float:
@@ -42,5 +42,5 @@ def win_probability_best_of(
     :return: The probability of "team1" winning the match
     """
     assert best_of % 2 and best_of > 0, best_of
-    beta_factor: float = {3: 1.44214, 5: 0.39479, 7: 0.21843}[best_of]
+    beta_factor: float = {3: 1.75794, 5: 0.37771, 7: 0.20026}[best_of]
     return win_probability(env, team1, team2, date, beta_factor)
