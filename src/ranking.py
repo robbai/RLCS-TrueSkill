@@ -1,5 +1,6 @@
+from copy import deepcopy
 from json import loads as parse_json
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from datetime import datetime as dtime
 from datetime import timedelta
 
@@ -8,14 +9,19 @@ from trueskill import Rating, TrueSkill
 from dateutil.parser import isoparse
 from currency_converter import CurrencyConverter
 
-from player import Player, dedupe_slug
+from player import REGION_RATING, Player, get_by_name, fix_player_name, dedupe_slug
 from requester import cache, get_content
 
 # Cache events and matches that are older than this.
 CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 
+TODAY: dtime = dtime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
 
 cc: CurrencyConverter = CurrencyConverter()
+
+
+PRE_MANUAL: Optional[Dict[str, Rating]] = None
 
 
 def event_filter(event: Dict) -> bool:
@@ -78,7 +84,11 @@ def get_matches() -> List[Tuple[str, int, bool]]:
         should_cache: bool = (
             isoparse(event_json["endDate"]).replace(tzinfo=None) < CACHE_TIME
         )
-        matches += [(match, should_cache) for match in matches_json["matches"]]
+        matches += [
+            (match, should_cache)
+            for match in matches_json["matches"]
+            if isoparse(match["date"]).replace(tzinfo=None) < TODAY
+        ]
         if should_cache:
             cache(url, matches_content)
 
@@ -129,33 +139,109 @@ def result_gen(match_json, should_cache):
         yield game, "winner" in game["orange"]
 
 
-def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
-    # Iterate through matches.
-    for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
-        date: dtime = isoparse(match_json["date"])
-        for game_json, winner in result_gen(match_json, should_cache):
-            if "event" in game_json:
-                region: str = game_json["event"]["region"]
-            else:
-                region: str = game_json["match"]["event"]["region"]
-            lan: bool = region == "INT"
+def add_manual_matches(env: TrueSkill, rankings: Dict[str, Player]):
+    manual_games: int = 0
+    teams: Dict[str, List[str]] = {}
+    try:
+        input("Manual matches:")
+    except KeyboardInterrupt:
+        exit()
+    named: Dict[str, Player] = {}
+    for line in open("manual.txt", "r").readlines():
+        line: str = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        tokens: List[str] = line.split(" ")
+        if tokens[0].isnumeric():
+            # Games.
+            teams_playing: List[str] = [team.upper() for team in tokens[1:]]
+            for _ in range(int(tokens[0])):
+                players: List[List[Player]] = [teams[team] for team in teams_playing]
+                assert all(len(n) == 3 for n in players)
+                print(
+                    ", ".join(p.name for p in players[0])
+                    + " beat "
+                    + ", ".join(p.name for p in players[1])
+                )
+                update_rankings(
+                    env,
+                    rankings,
+                    [[p.slug for p in t] for t in players],
+                    0,
+                )
+                manual_games += 1
+        elif len(tokens) > 1:
+            # New player.
+            team_name: str = tokens[0].upper()
+            player_name: str = fix_player_name(" ".join(tokens[1:]))
+            if team_name not in teams:
+                teams[team_name] = []
+            player: Player = (
+                named[player_name]
+                if player_name in named
+                else get_by_name(rankings, player_name)
+            )
+            if not player:
+                region: str = None
+                while region not in REGION_RATING:
+                    region = input(f"Region for {player_name}: ").upper()
+                player = Player(f"????-{player_name.lower()}", region, env)
+                rankings[player.slug] = player
+            named[player_name] = player
+            teams[team_name].append(player)
+            teams[team_name].sort(key=lambda player: player.name)
+        elif tokens[0] == "res":
+            count: int = 0
+            for player in rankings.values():
+                if not player.last_played:
+                    player.reset()
+                    count += 1
+            print(f"End of day, reset {count} players")
+        else:
+            print("Unrecognised line: '" + line + "'")
+            assert False, line
+    print("Manual matches: " + str(manual_games) + " games")
 
-            slugs: List[List[str]] = [[], []]
 
-            for team, colour in enumerate(("blue", "orange")):
-                for player in game_json[colour]["players"]:
-                    slug: str = dedupe_slug(player["player"]["slug"])
-                    slugs[team].append(slug)
-                    if slug not in rankings:
-                        player: Player = Player(slug, region, env)
-                        player.debut = (
-                            game_json["event"]["name"]
-                            if "event" in game_json
-                            else game_json["match"]["event"]["name"]
-                        )
-                        rankings[slug] = player
+def setup_ranking(env: TrueSkill) -> Dict[str, Rating]:
+    rankings: Dict[str, Rating] = {}
 
-            if any(len(roster) != 3 for roster in slugs):
-                break
+    global PRE_MANUAL
+    if not PRE_MANUAL:
+        # Iterate through matches.
+        for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
+            date: dtime = isoparse(match_json["date"])
+            for game_json, winner in result_gen(match_json, should_cache):
+                if "event" in game_json:
+                    region: str = game_json["event"]["region"]
+                else:
+                    region: str = game_json["match"]["event"]["region"]
+                lan: bool = region == "INT"
 
-            update_rankings(env, rankings, slugs, winner, date, lan)
+                slugs: List[List[str]] = [[], []]
+
+                for team, colour in enumerate(("blue", "orange")):
+                    for player in game_json[colour]["players"]:
+                        slug: str = dedupe_slug(player["player"]["slug"])
+                        slugs[team].append(slug)
+                        if slug not in rankings:
+                            player: Player = Player(slug, region, env)
+                            player.debut = (
+                                game_json["event"]["name"]
+                                if "event" in game_json
+                                else game_json["match"]["event"]["name"]
+                            )
+                            rankings[slug] = player
+
+                if any(len(roster) != 3 for roster in slugs):
+                    break
+
+                update_rankings(env, rankings, slugs, winner, date, lan)
+        PRE_MANUAL = deepcopy(rankings)
+    else:
+        rankings = deepcopy(PRE_MANUAL)
+
+    # Manual matches.
+    add_manual_matches(env, rankings)
+
+    return rankings

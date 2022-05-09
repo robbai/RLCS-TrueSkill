@@ -1,5 +1,5 @@
 from re import sub
-from typing import Dict, Union, Optional
+from typing import Dict, List, Union, Optional
 from datetime import datetime as dtime
 
 from trueskill import Rating, TrueSkill
@@ -46,8 +46,10 @@ def name_from_slug(slug: str):
 
 
 def different_date(d1: Optional[dtime], d2: Optional[dtime]):
-    if (not d1) != (not d2):
+    if bool(d1) != bool(d2):
         return True
+    if not bool(d1) and not bool(d2):
+        return False
     return d1.day != d2.day or d1.month != d2.month or d1.year != d2.year
 
 
@@ -78,3 +80,28 @@ class Player:
         if isinstance(date, bool):
             return self.momentum * date
         return 0 if different_date(self.last_played, date) else self.momentum
+
+
+def get_by_name(rankings: Dict[str, Player], name: str):
+    name = fix_player_name(name)
+    players: List[Player] = [
+        player for player in rankings.values() if player.name == name
+    ]
+    if not players:
+        return None
+    if len(players) == 1:
+        return players[0]
+    print(f"Found {len(players)} players named {name}:")
+    print(
+        *[
+            f"#{i + 1} - {name} ({player.region}): {player.slug}"
+            for i, player in enumerate(players)
+        ],
+        sep="\n",
+    )
+    while True:
+        try:
+            selected: int = int(input("Select: "))
+            return players[selected - 1]
+        except (ValueError, IndexError):
+            print("Invalid selection.")
