@@ -16,6 +16,18 @@ REGION_RATING: Dict[str, float] = {
 }
 
 
+DEDUPED_SLUGS: Dict[str, str] = {
+    "41d5-radosin75": "41d5-radosin",
+    "23f9-spectre": "23f9-simas",
+    "9a22-scrubbed": "9a22-scrub",
+    "456e-stepsisterrrr": "9a22-scrub",
+}
+
+
+def dedupe_slug(slug: str) -> str:
+    return DEDUPED_SLUGS[slug] if slug in DEDUPED_SLUGS else slug
+
+
 def fix_player_name(name: str) -> str:
     name = sub(r"[_-]+", " ", name)
     name = name.strip()

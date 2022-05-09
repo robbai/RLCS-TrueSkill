@@ -8,7 +8,7 @@ from trueskill import Rating, TrueSkill
 from dateutil.parser import isoparse
 from currency_converter import CurrencyConverter
 
-from player import Player
+from player import Player, dedupe_slug
 from requester import cache, get_content
 
 # Cache events and matches that are older than this.
@@ -139,7 +139,7 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
 
             for team, colour in enumerate(("blue", "orange")):
                 for player in game_json[colour]["players"]:
-                    slug: str = player["player"]["slug"]
+                    slug: str = dedupe_slug(player["player"]["slug"])
                     slugs[team].append(slug)
                     if slug not in rankings:
                         player: Player = Player(slug, region, env)
