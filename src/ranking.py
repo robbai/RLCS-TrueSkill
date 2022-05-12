@@ -129,6 +129,7 @@ def result_gen(match_json, should_cache):
 def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
     # Iterate through matches.
     for match_json, should_cache in tqdm(get_matches(), desc="Matches"):
+        date: dtime = isoparse(match_json["date"])
         for game_json, winner in result_gen(match_json, should_cache):
             if "event" in game_json:
                 region: str = game_json["event"]["region"]
@@ -153,5 +154,4 @@ def setup_ranking(env: TrueSkill, rankings: Dict[str, Player]):
             if any(len(roster) != 3 for roster in slugs):
                 break
 
-            date: dtime = isoparse(game_json["date"])
             update_rankings(env, rankings, slugs, winner, date)
