@@ -25,9 +25,9 @@ def win_probability(
     :return: The probability of "team1" winning a single game
     """
     delta_mu: float = total_mu(team1, date) - total_mu(team2, date)
-    sum_sigma: float = sum(p.rating.sigma ** 2 for p in team1 + team2)
+    sum_sigma: float = sum(p.rating.sigma**2 for p in team1 + team2)
     size: int = len(team1) + len(team2)
-    denom: float = sqrt(size * env.beta ** 2 * beta_factor + sum_sigma)
+    denom: float = sqrt(size * env.beta**2 * beta_factor + sum_sigma)
     return env.cdf(delta_mu / denom)
 
 
@@ -42,5 +42,5 @@ def win_probability_best_of(
     :return: The probability of "team1" winning the match
     """
     assert best_of % 2 and best_of > 0, best_of
-    beta_factor: float = {3: 1.75794, 5: 0.37771, 7: 0.20026}[best_of]
+    beta_factor: float = {3: 1.42774, 5: 0.34486, 7: 0.19642}[best_of]
     return win_probability(env, team1, team2, date, beta_factor)
