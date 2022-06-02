@@ -20,7 +20,7 @@ CACHE_TIME: dtime = dtime.now().replace(tzinfo=None) - timedelta(weeks=1)
 cc: CurrencyConverter = CurrencyConverter()
 
 
-MAJOR_NAME: str = "RLCS 2021-22 Fall Major"
+MAJOR_NAME: str = "RLCS 2021-22 Winter Major"
 all_games: List = []
 losses: Dict[int, float] = None
 
@@ -179,10 +179,8 @@ def setup_ranking(env: TrueSkill) -> Dict[int, Tuple[float, int, float]]:
     for date, (game_json, winner, best_of) in games_gen():
         if "event" in game_json:
             region: str = game_json["event"]["region"]
-            event_name: str = game_json["event"]["name"]
         else:
             region: str = game_json["match"]["event"]["region"]
-            event_name: str = game_json["match"]["event"]["name"]
 
         slugs: List[List[str]] = [[], []]
 
