@@ -21,6 +21,7 @@ DEDUPED_SLUGS: Dict[str, str] = {
     "23f9-spectre": "23f9-simas",
     "9a22-scrubbed": "9a22-scrub",
     "456e-stepsisterrrr": "9a22-scrub",
+    "433d-sadness": "433d-sad",
 }
 
 
