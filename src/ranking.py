@@ -9,7 +9,7 @@ from trueskill import Rating, TrueSkill
 from dateutil.parser import isoparse
 from currency_converter import CurrencyConverter
 
-from player import REGION_RATING, Player, get_by_name, fix_player_name, dedupe_slug
+from player import REGION_RATING, Player, dedupe_slug, get_by_name, fix_player_name
 from requester import cache, get_content
 
 # Cache events and matches that are older than this.
@@ -152,7 +152,7 @@ def add_manual_matches(env: TrueSkill, rankings: Dict[str, Player]):
         if not line or line.startswith("#"):
             continue
         tokens: List[str] = line.split(" ")
-        if tokens[0].isnumeric():
+        if tokens[0].isnumeric() and str(int(tokens[0])) == tokens[0]:
             # Games.
             teams_playing: List[str] = [team.upper() for team in tokens[1:]]
             for _ in range(int(tokens[0])):
