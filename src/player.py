@@ -5,14 +5,14 @@ from datetime import datetime as dtime
 from trueskill import Rating, TrueSkill
 
 REGION_RATING: Dict[str, float] = {
-    "NA": (97.26, -13.17),
+    "NA": (98.33, -13.17),
     "EU": (100, -14.41),
-    "INT": (99.82, -14.09),
-    "OCE": (75.69, -16.87),
-    "SAM": (76.64, -19.89),
-    "ME": (77.45, -22.78),
-    "ASIA": (46.63, -27.77),
-    "AF": (35.87, -26.43),
+    "INT": (98.9, -14.09),
+    "OCE": (73.52, -16.87),
+    "SAM": (80.23, -19.89),
+    "ME": (71.2, -22.78),
+    "ASIA": (28.12, -27.77),
+    "AF": (19.08, -26.43),
 }
 
 
