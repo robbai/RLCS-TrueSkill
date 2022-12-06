@@ -4,6 +4,9 @@ from datetime import datetime as dtime
 
 from trueskill import Rating, TrueSkill
 
+LAN_SCALE: float = 0.1300
+
+
 REGION_RATING: Dict[str, float] = {
     "NA": (98.33, -12.58),
     "EU": (100, -14.58),
@@ -57,11 +60,14 @@ class Player:
         self.debut: str = "Unknown"
         self.last_played: Optional[dtime] = None
         self.momentum: float = 0  # Total mu change today.
+        self.lan_bonus: float = 0
 
-    def update(self, rating: Rating, date: Optional[dtime] = None):
+    def update(self, rating: Rating, date: Optional[dtime] = None, lan: bool = False):
         if different_date(self.last_played, date):
             self.reset(date)
-        self.momentum += rating.mu - self.rating.mu
+        delta_rating: float = rating.mu - self.rating.mu
+        self.momentum += delta_rating
+        self.lan_bonus += delta_rating * LAN_SCALE * lan
         self.rating = rating
 
     def reset(self, date: Optional[dtime] = None):

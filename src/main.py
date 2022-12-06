@@ -10,6 +10,8 @@ from player import Player, fix_player_name
 from ranking import setup_ranking
 from probability import win_probability_best_of
 
+LAN: bool = False
+
 
 def get_by_name(rankings: Dict[str, Player], name: str):
     name = fix_player_name(name)
@@ -92,9 +94,15 @@ def main():
                 player.rating.mu,
                 player.rating.sigma,
                 player.momentum,
+                player.lan_bonus,
             )
         )
-    print(tabulate(leaderboard, headers=["Name", "Region", "Mu", "Sigma", "Momentum"]))
+    print(
+        tabulate(
+            leaderboard,
+            headers=["Name", "Region", "Mu", "Sigma", "Momentum", "LAN Bonus"],
+        )
+    )
     print()
 
     # Dictionary of team names to rankings.
@@ -116,7 +124,9 @@ def main():
             + str(round(ratios[1], 4)),
         ]
         for best_of in range(3, 8, 2):
-            probability: float = win_probability_best_of(env, best_of, *players, date)
+            probability: float = win_probability_best_of(
+                env, best_of, *players, LAN, date
+            )
             best_bet: float = get_best_bet(probability, ratios)
             output.append(
                 ("+" if (probability > 0.5) == (best_bet > 0) else "-")
