@@ -125,7 +125,7 @@ def main():
         ]
         for best_of in range(3, 8, 2):
             probability: float = win_probability_best_of(
-                env, best_of, *players, LAN, date
+                env, best_of, *players, date, LAN
             )
             best_bet: float = get_best_bet(probability, ratios)
             output.append(
