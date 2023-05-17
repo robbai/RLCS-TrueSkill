@@ -19,7 +19,7 @@ cc: CurrencyConverter = CurrencyConverter()
 
 
 def event_filter(event: Dict) -> bool:
-    if event["name"] in ["Gamers Without Borders 2022", "Gamers8 2022"]:
+    if any(name in event["name"] for name in ["Gamers Without Borders", "Gamers8"]):
         return False
     if "groups" in event:
         groups: List[str] = event["groups"]
